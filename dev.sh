@@ -6,10 +6,8 @@
 #
 # Description: dDEV symfony dev shortening tools
 # Usage: dev [OPTIONS]
-# Version: 1.0.0
+# Version: 1.0.1
 # https://github.com/akaw/dev/
-
-VERSION="1.0.0"
 
 # Hilfsfunktion: Liest die neueste Versionsnummer aus Git-Tags
 _get_latest_version() {
@@ -131,18 +129,26 @@ _upgrade() {
         return 1
     fi
     
-    # Validate version format
+    # Validate version format and determine current version
     if [[ ! "$latest_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         echo "[ERROR] Invalid version format received from server: $latest_version" >&2
         return 1
     fi
 
-    if [[ "$latest_version" == "$VERSION" ]]; then
-        echo "[INFO] You already have the latest version ($VERSION)."
+    # Determine current version from this script's header ("# Version: X.Y.Z")
+    local current_version
+    current_version=$(grep -m 1 "^# Version:" "$script_path" 2>/dev/null | awk '{print $NF}')
+    if [[ -z "$current_version" || ! "$current_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        # If we cannot determine current version, treat as not up-to-date (proceed with upgrade)
+        current_version="0.0.0"
+    fi
+
+    if [[ "$latest_version" == "$current_version" ]]; then
+        echo "[INFO] You already have the latest version ($current_version)."
         return 0
     fi
 
-    echo "[INFO] New version found: $latest_version (current: $VERSION)"
+    echo "[INFO] New version found: $latest_version (current: $current_version)"
     echo "[INFO] Downloading update..."
 
     # Download new version with better error handling
@@ -240,11 +246,11 @@ _upgrade() {
         rm -f "$temp_hash"
         echo "[INFO] Update successful!"
         
-        # Get the new version directly from the script
+        # Get the new version directly from the updated script header
         local new_version
-        if new_version=$(grep -m 1 "^VERSION=" "$script_path" | cut -d'"' -f2); then
-            VERSION="$new_version"
-            echo "[INFO] New version: ${VERSION}"
+        new_version=$(grep -m 1 "^# Version:" "$script_path" 2>/dev/null | awk '{print $NF}')
+        if [[ -n "$new_version" && "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "[INFO] New version: ${new_version}"
         else
             echo "[WARN] Could not determine new version from updated script" >&2
         fi
