@@ -9,6 +9,7 @@
 # Version: 1.0.0
 # https://github.com/akaw/dev/
 
+VERSION="1.0.0"
 
 # Hilfsfunktion: Liest die neueste Versionsnummer aus Git-Tags
 _get_latest_version() {
@@ -113,7 +114,7 @@ _create_release_tag() {
 # Function to upgrade the script
 _upgrade() {
     local script_path="${BASH_SOURCE[0]}"
-    info "Checking for updates..."
+    echo "[INFO] Checking for updates..."
 
     # Temporary files for downloads
     local temp_script="/tmp/dev_new_version"
@@ -122,50 +123,51 @@ _upgrade() {
     # Check current version against latest version first
     local latest_version
     if ! latest_version=$(curl -s -m 5 "https://raw.githubusercontent.com/akaw/dev/main/dev" | grep -m 1 "^VERSION=" | cut -d'"' -f2); then
-        handle_error "Could not check for updates. Please check your internet connection." "update check"
-        info "Possible solutions:"
-        info "  - Check your internet connection"
-        info "  - Verify firewall settings"
-        info "  - Try again later"
+        echo "[ERROR] Could not check for updates. Please check your internet connection." >&2
+        echo "[INFO] Possible solutions:" >&2
+        echo "[INFO]   - Check your internet connection" >&2
+        echo "[INFO]   - Verify firewall settings" >&2
+        echo "[INFO]   - Try again later" >&2
         return 1
     fi
     
-    validate_param "$latest_version" "latest_version" "version_format" || {
-        handle_error "Invalid version format received from server: $latest_version" "update check"
+    # Validate version format
+    if [[ ! "$latest_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "[ERROR] Invalid version format received from server: $latest_version" >&2
         return 1
-    }
+    fi
 
     if [[ "$latest_version" == "$VERSION" ]]; then
-        info "You already have the latest version ($VERSION)."
+        echo "[INFO] You already have the latest version ($VERSION)."
         return 0
     fi
 
-    info "New version found: $latest_version (current: $VERSION)"
-    info "Downloading update..."
+    echo "[INFO] New version found: $latest_version (current: $VERSION)"
+    echo "[INFO] Downloading update..."
 
     # Download new version with better error handling
     if ! curl -s -o "$temp_script" "https://raw.githubusercontent.com/akaw/dev/main/dev"; then
-        handle_error "Download of new version failed" "update download"
-        info "Please check your internet connection and try again"
+        echo "[ERROR] Download of new version failed" >&2
+        echo "[INFO] Please check your internet connection and try again" >&2
         return 1
     fi
 
     if ! curl -s -o "$temp_hash" "https://raw.githubusercontent.com/akaw/dev/main/dev.sha256"; then
-        handle_error "Download of hash file failed" "update download"
+        echo "[ERROR] Download of hash file failed" >&2
         rm -f "$temp_script"
-        info "Please check your internet connection and try again"
+        echo "[INFO] Please check your internet connection and try again" >&2
         return 1
     fi
     
     # Verify downloaded files are not empty
     if [[ ! -s "$temp_script" ]]; then
-        handle_error "Downloaded script file is empty" "update download"
+        echo "[ERROR] Downloaded script file is empty" >&2
         rm -f "$temp_script" "$temp_hash"
         return 1
     fi
     
     if [[ ! -s "$temp_hash" ]]; then
-        handle_error "Downloaded hash file is empty" "update download"
+        echo "[ERROR] Downloaded hash file is empty" >&2
         rm -f "$temp_script" "$temp_hash"
         return 1
     fi
@@ -177,7 +179,7 @@ _upgrade() {
 
     # Validate expected hash format
     if [[ ! "$expected_hash" =~ ^[a-f0-9]{64}$ ]]; then
-        handle_error "Invalid hash format received: $expected_hash" "hash verification"
+        echo "[ERROR] Invalid hash format received: $expected_hash" >&2
         rm -f "$temp_script" "$temp_hash"
         return 1
     fi
@@ -185,39 +187,39 @@ _upgrade() {
     if command -v shasum >/dev/null 2>&1; then
         # macOS typically uses shasum
         if ! actual_hash=$(shasum -a 256 "$temp_script" 2>/dev/null | awk '{print $1}'); then
-            handle_error "Failed to calculate SHA256 hash using shasum" "hash verification"
+            echo "[ERROR] Failed to calculate SHA256 hash using shasum" >&2
             rm -f "$temp_script" "$temp_hash"
             return 1
         fi
     elif command -v sha256sum >/dev/null 2>&1; then
         # Linux typically uses sha256sum
         if ! actual_hash=$(sha256sum "$temp_script" 2>/dev/null | awk '{print $1}'); then
-            handle_error "Failed to calculate SHA256 hash using sha256sum" "hash verification"
+            echo "[ERROR] Failed to calculate SHA256 hash using sha256sum" >&2
             rm -f "$temp_script" "$temp_hash"
             return 1
         fi
     else
-        handle_error "No SHA256 utility found (shasum or sha256sum required)" "hash verification"
-        info "Please install a SHA256 utility and try again"
+        echo "[ERROR] No SHA256 utility found (shasum or sha256sum required)" >&2
+        echo "[INFO] Please install a SHA256 utility and try again" >&2
         rm -f "$temp_script" "$temp_hash"
         return 1
     fi
 
     if [[ "$actual_hash" != "$expected_hash" ]]; then
-        handle_error "Hash verification failed! The update might be compromised." "hash verification"
-        error "Expected: $expected_hash"
-        error "Actual: $actual_hash"
-        info "This could indicate:"
-        info "  - Network corruption during download"
-        info "  - Compromised update server"
-        info "  - Man-in-the-middle attack"
+        echo "[ERROR] Hash verification failed! The update might be compromised." >&2
+        echo "[ERROR] Expected: $expected_hash" >&2
+        echo "[ERROR] Actual: $actual_hash" >&2
+        echo "[INFO] This could indicate:" >&2
+        echo "[INFO]   - Network corruption during download" >&2
+        echo "[INFO]   - Compromised update server" >&2
+        echo "[INFO]   - Man-in-the-middle attack" >&2
         rm -f "$temp_script" "$temp_hash"
         return 1
     fi
 
     # Create backup with error handling
     if ! cp "$script_path" "${script_path}.backup"; then
-        handle_error "Failed to create backup of current script" "update installation"
+        echo "[ERROR] Failed to create backup of current script" >&2
         rm -f "$temp_script" "$temp_hash"
         return 1
     fi
@@ -228,7 +230,7 @@ _upgrade() {
     # Install new version
     if mv "$temp_script" "$script_path"; then
         if ! chmod +x "$script_path"; then
-            handle_error "Failed to set executable permissions on updated script" "update installation"
+            echo "[ERROR] Failed to set executable permissions on updated script" >&2
             # Restore backup
             mv "${script_path}.backup" "$script_path"
             rm -f "$temp_hash"
@@ -236,24 +238,24 @@ _upgrade() {
         fi
         
         rm -f "$temp_hash"
-        info "Update successful!"
+        echo "[INFO] Update successful!"
         
         # Get the new version directly from the script
         local new_version
         if new_version=$(grep -m 1 "^VERSION=" "$script_path" | cut -d'"' -f2); then
             VERSION="$new_version"
-            info "New version: ${VERSION}"
+            echo "[INFO] New version: ${VERSION}"
         else
-            warn "Could not determine new version from updated script"
+            echo "[WARN] Could not determine new version from updated script" >&2
         fi
         
-        info "Please restart your shell or run 'hash -r' to clear command cache."
+        echo "[INFO] Please restart your shell or run 'hash -r' to clear command cache."
     else
-        handle_error "Failed to install updated script" "update installation"
-        info "Restoring backup..."
+        echo "[ERROR] Failed to install updated script" >&2
+        echo "[INFO] Restoring backup..." >&2
         if ! mv "${script_path}.backup" "$script_path"; then
-            handle_error "CRITICAL: Failed to restore backup! Script may be corrupted." "update installation"
-            info "Please manually restore from: ${script_path}.backup"
+            echo "[ERROR] CRITICAL: Failed to restore backup! Script may be corrupted." >&2
+            echo "[INFO] Please manually restore from: ${script_path}.backup" >&2
         fi
         rm -f "$temp_script" "$temp_hash"
         return 1
