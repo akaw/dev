@@ -122,7 +122,7 @@ _upgrade() {
 
     # Check current version against latest version first
     local latest_version
-    if ! latest_version=$(curl -s -m 5 "https://raw.githubusercontent.com/akaw/dev/main/dev" | grep -m 1 "^VERSION=" | cut -d'"' -f2); then
+    if ! latest_version=$(curl -s -m 5 "https://raw.githubusercontent.com/akaw/dev/main/dev.sh" | grep -m 1 "^# Version:" | awk '{print $NF}'); then
         echo "[ERROR] Could not check for updates. Please check your internet connection." >&2
         echo "[INFO] Possible solutions:" >&2
         echo "[INFO]   - Check your internet connection" >&2
@@ -146,13 +146,13 @@ _upgrade() {
     echo "[INFO] Downloading update..."
 
     # Download new version with better error handling
-    if ! curl -s -o "$temp_script" "https://raw.githubusercontent.com/akaw/dev/main/dev"; then
+    if ! curl -s -o "$temp_script" "https://raw.githubusercontent.com/akaw/dev/main/dev.sh"; then
         echo "[ERROR] Download of new version failed" >&2
         echo "[INFO] Please check your internet connection and try again" >&2
         return 1
     fi
 
-    if ! curl -s -o "$temp_hash" "https://raw.githubusercontent.com/akaw/dev/main/dev.sha256"; then
+    if ! curl -s -o "$temp_hash" "https://raw.githubusercontent.com/akaw/dev/main/dev.sh.sha256"; then
         echo "[ERROR] Download of hash file failed" >&2
         rm -f "$temp_script"
         echo "[INFO] Please check your internet connection and try again" >&2
