@@ -4,7 +4,7 @@ A Bash script that provides shortcuts for commonly used `ddev`, `symfony` and ot
 
 ## Features
 
-- Simplified commands for ddev operations
+- Simplified commands for ddev operations (e.g., )
 - Release version management via Git tags
 - Automatic version numbering (e.g., release:patch => v1.0.(1+1))
 
@@ -35,7 +35,8 @@ Use `dev upgrade` to update the script to the latest version. This command check
 The script provides various commands to simplify development workflows:
 
 - **ddev commands**: Execute ddev operations without typing the full `ddev exec` prefix
-- **symfony commands**: Quick access to Symfony CLI tools like cc == cache:clear
+- **symfony commands**: Quick access to Symfony CLI tools (e.g., `cc` for `cache:clear`)
+- **dev u**: 
 - **release commands**: Manage version releases with automatic Git tagging
     - `release:major` - Increment major version and push new tag
     - `release:minor` - Increment minor version and push new tag
@@ -50,7 +51,7 @@ dev [OPTIONS]
 
 ## Version
 
-2.0.0
+1.0.0
 
 ## Author
 

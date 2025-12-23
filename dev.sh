@@ -6,8 +6,8 @@
 #
 # Description: dDEV symfony dev shortening tools
 # Usage: dev [OPTIONS]
-# Version: 2.0.0
-# https://github.com/akaw/simple-dev-cli-tools/
+# Version: 1.0.0
+# https://github.com/akaw/dev/
 
 
 # Hilfsfunktion: Liest die neueste Versionsnummer aus Git-Tags
@@ -121,7 +121,7 @@ _upgrade() {
 
     # Check current version against latest version first
     local latest_version
-    if ! latest_version=$(curl -s -m 5 "https://raw.githubusercontent.com/akaw/dev-cli-tools/main/src/dev" | grep -m 1 "^VERSION=" | cut -d'"' -f2); then
+    if ! latest_version=$(curl -s -m 5 "https://raw.githubusercontent.com/akaw/dev/main/dev" | grep -m 1 "^VERSION=" | cut -d'"' -f2); then
         handle_error "Could not check for updates. Please check your internet connection." "update check"
         info "Possible solutions:"
         info "  - Check your internet connection"
@@ -143,14 +143,14 @@ _upgrade() {
     info "New version found: $latest_version (current: $VERSION)"
     info "Downloading update..."
 
-    # Download new version and hash file with better error handling
-    if ! curl -s -o "$temp_script" "https://raw.githubusercontent.com/akaw/dev-cli-tools/main/src/dev"; then
+    # Download new version with better error handling
+    if ! curl -s -o "$temp_script" "https://raw.githubusercontent.com/akaw/dev/main/dev"; then
         handle_error "Download of new version failed" "update download"
         info "Please check your internet connection and try again"
         return 1
     fi
 
-    if ! curl -s -o "$temp_hash" "https://raw.githubusercontent.com/akaw/dev-cli-tools/main/src/dev.sha256"; then
+    if ! curl -s -o "$temp_hash" "https://raw.githubusercontent.com/akaw/dev/main/dev.sha256"; then
         handle_error "Download of hash file failed" "update download"
         rm -f "$temp_script"
         info "Please check your internet connection and try again"
@@ -215,20 +215,17 @@ _upgrade() {
         return 1
     fi
 
-    # Create backup
-    cp "$script_path" "${script_path}.backup"
-
-    # Remove update marker to force version check on next run
-    rm -f "/tmp/dev_update_check_$(date +%Y%m%d)" 2>/dev/null
-
-    # Backup current script with error handling
+    # Create backup with error handling
     if ! cp "$script_path" "${script_path}.backup"; then
         handle_error "Failed to create backup of current script" "update installation"
         rm -f "$temp_script" "$temp_hash"
         return 1
     fi
 
-    # Install new version with atomic operation
+    # Remove update marker to force version check on next run
+    rm -f "/tmp/dev_update_check_$(date +%Y%m%d)" 2>/dev/null
+
+    # Install new version
     if mv "$temp_script" "$script_path"; then
         if ! chmod +x "$script_path"; then
             handle_error "Failed to set executable permissions on updated script" "update installation"
@@ -245,7 +242,7 @@ _upgrade() {
         local new_version
         if new_version=$(grep -m 1 "^VERSION=" "$script_path" | cut -d'"' -f2); then
             VERSION="$new_version"
-        info "New version: ${VERSION}"
+            info "New version: ${VERSION}"
         else
             warn "Could not determine new version from updated script"
         fi
@@ -263,7 +260,7 @@ _upgrade() {
     fi
 
     rm -f "${script_path}.backup"
-    exit 0
+    return 0
 }
 
 dev() {
