@@ -287,16 +287,16 @@ dev() {
         r)
             command ddev restart
             ;;
-        se|seq)
-            command ddev sequelace
-            ;;
         stat|st)
             command ddev status
             ;;
-        open:website|op:we|website|site|web|ow)
+        open:sequelace|op:se|opse|os|se|seq)
+            command ddev sequelace
+            ;;
+        open:website|op:we|opwe|ow|website|site|web)
             command ddev launch
             ;;
-        mail)
+        open:mailhog|op:ma|opma|om|mail)
             command ddev mailhog
             ;;
         cache:clear|ca:cl|cacl|cc)
@@ -314,7 +314,7 @@ dev() {
         messenger:consume|me:co|mc)
             command ddev exec bin/console messenger:consume -vv
             ;;
-        messenger:failed|me:co:fa|mcfa)
+        messenger:failed|me:fa|mf)
             command ddev exec bin/console messenger:consume failed -vv
             ;;
         messenger:high|me:hi|mh)
@@ -438,7 +438,7 @@ dev() {
             echo "  ms, me:st, messenger:stats             - Show messenger queue stats"
             echo ""
             echo "Services:"
-            echo "  seq, start:sequelace, se               - Run Sequel Ace"
+            echo "  seq, se, open:sequelace                - Run Sequel Ace"
             echo "  mail, mailhog, op:ma, open:mailhog     - Open Mailhog"
             echo ""
             echo "Testing:"
@@ -451,6 +451,7 @@ dev() {
             echo "  release:major, re:ma, rema             - Create major release"
             echo ""
             echo "Other:"
+            echo "  upgrade                                - Upgrade dev script to latest version"
             echo "  reload                                 - Reload dev environment"
             echo "  help, -h, --help                       - Show this help"
             ;;
@@ -470,11 +471,11 @@ if [[ -n $ZSH_VERSION ]]; then
             build
             up down
             status
-            mailhog 
+            mailhog
             open:mailhog
             open:website
-            seq 
-            start:sequelace
+            open:sequelace
+            seq
             messenger:consume
             messenger:failed
             messenger:high
