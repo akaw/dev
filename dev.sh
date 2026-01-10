@@ -6,7 +6,7 @@
 #
 # Description: dDEV symfony dev shortening tools
 # Usage: dev [OPTIONS]
-# Version: 1.3.2
+# Version: 1.3.3
 # https://github.com/akaw/dev/
 
 # Hilfsfunktion: Liest die neueste Versionsnummer aus Git-Tags
