@@ -117,11 +117,28 @@ _upgrade() {
     if [[ -z "$script_path" || ! -f "$script_path" ]]; then
         script_path=""
         
-        # Try BASH_SOURCE first
-        [[ -n "${BASH_SOURCE[0]}" && -f "${BASH_SOURCE[0]}" ]] && script_path="${BASH_SOURCE[0]}"
+        # Try BASH_SOURCE array (most reliable for sourced scripts)
+        if [[ -n "${BASH_SOURCE[0]}" && -f "${BASH_SOURCE[0]}" ]]; then
+            script_path="${BASH_SOURCE[0]}"
+        elif [[ -n "${BASH_SOURCE[1]}" && -f "${BASH_SOURCE[1]}" ]]; then
+            script_path="${BASH_SOURCE[1]}"
+        fi
+        
+        # Try readlink on the function source (works when script is in PATH)
+        if [[ -z "$script_path" ]] && command -v dev >/dev/null 2>&1; then
+            local which_path=$(command -v dev 2>/dev/null)
+            if [[ -n "$which_path" && -f "$which_path" ]]; then
+                # Resolve symlinks
+                if command -v readlink >/dev/null 2>&1; then
+                    script_path=$(readlink -f "$which_path" 2>/dev/null || readlink "$which_path" 2>/dev/null || echo "$which_path")
+                else
+                    script_path="$which_path"
+                fi
+            fi
+        fi
         
         # Try common locations
-        if [[ -z "$script_path" ]]; then
+        if [[ -z "$script_path" || ! -f "$script_path" ]]; then
             for path in ~/bin/dev.sh "$HOME/bin/dev.sh" /usr/local/bin/dev.sh /opt/dev/dev.sh; do
                 if [[ -f "$path" ]] && grep -q "^# Version:" "$path" 2>/dev/null; then
                     script_path="$path"
@@ -130,19 +147,17 @@ _upgrade() {
             done
         fi
         
-        # Try which/command
-        if [[ -z "$script_path" ]] && command -v dev >/dev/null 2>&1; then
-            local which_path=$(which dev 2>/dev/null || command -v dev 2>/dev/null)
-            [[ -f "$which_path" ]] && head -n 1 "$which_path" 2>/dev/null | grep -q "^#!" && script_path="$which_path"
+        # Try $0 as last fallback
+        if [[ -z "$script_path" || ! -f "$script_path" ]]; then
+            [[ -n "$0" && "$0" != "-"* && -f "$0" ]] && script_path="$0"
         fi
-        
-        # Try $0 as fallback
-        [[ -z "$script_path" && -n "$0" && "$0" != "-"* && -f "$0" ]] && script_path="$0"
     fi
     
     # Validate script path
     if [[ -z "$script_path" || ! -f "$script_path" ]]; then
-        echo "[ERROR] Could not determine script path. Please specify manually: dev upgrade /path/to/dev.sh" >&2
+        echo "[ERROR] Could not determine script path automatically." >&2
+        echo "[INFO] Tried: BASH_SOURCE, which/command -v, common paths, \$0" >&2
+        echo "[INFO] Please specify manually: dev upgrade /path/to/dev.sh" >&2
         return 1
     fi
     
