@@ -96,10 +96,16 @@ Running dev without known commands executes `ddev exec`.
 - `upgrade` - Upgrade script to latest version
 - `help`, `-h`, `--help` - Show help message
 
-## Author
-
-Andre Witte and cursor
-
 ## Repository
 
 https://github.com/akaw/dev/
+
+## Version
+
+Current Version: **1.3.0**
+
+Versions can be retrieved directly from the script:
+
+```bash
+grep "^# Version:" admin.sh
+```
