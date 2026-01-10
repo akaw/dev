@@ -1,130 +1,125 @@
-# Release-Strategie für dev.sh und admin.sh
+# Release Strategy for dev.sh
 
-Diese Dokumentation beschreibt die Release-Strategie für die Skripte `dev.sh` und `admin.sh`, damit diese einfach über den `upgrade` Befehl aktualisiert werden können.
+This documentation describes the release strategy for the `dev.sh` script, enabling it to be easily updated via the `upgrade` command.
 
-## Überblick
+## Overview
 
-Die Release-Strategie ermöglicht es, neue Versionen der Skripte automatisch zu erstellen, zu versionieren und zu veröffentlichen. Das Release-Script `release.sh` automatisiert den gesamten Prozess:
+The release strategy enables automatic creation, versioning, and publishing of new script versions. The `release.sh` script automates the entire process:
 
-1. Versionsnummern werden automatisch aktualisiert
-2. SHA256-Hash-Dateien werden automatisch generiert
-3. Git-Tags werden erstellt
-4. Änderungen werden automatisch gepusht
+1. Version numbers are automatically updated
+2. SHA256 hash files are automatically generated
+3. Git tags are created
+4. Changes are automatically pushed
 
-## Voraussetzungen
+## Prerequisites
 
-- Git Repository mit konfiguriertem Remote `origin`
-- Sauberes Working Directory (keine uncommitted changes)
-- Beide Skripte (`dev.sh` und `admin.sh`) müssen vorhanden sein
-- SHA256-Hash-Utility (`shasum` auf macOS oder `sha256sum` auf Linux)
+- Git repository with configured remote `origin`
+- Clean working directory (no uncommitted changes)
+- The `dev.sh` script must exist
+- SHA256 hash utility (`shasum` on macOS or `sha256sum` on Linux)
 
-## Verwendung
+## Usage
 
-### Grundlegende Syntax
+### Basic Syntax
 
 ```bash
-./release.sh [type] [script]
+./release.sh [type]
 ```
 
-**Parameter:**
-- `type`: Release-Typ (`patch`, `minor`, `major`)
-- `script`: Zu releasendes Skript (`dev`, `admin`, oder leer für beide)
+**Parameters:**
+- `type`: Release type (`patch`, `minor`, `major`)
 
-### Beispiele
+### Examples
 
 ```bash
-# Patch Release für dev.sh (Bugfix)
-./release.sh patch dev
-
-# Minor Release für admin.sh (neue Features)
-./release.sh minor admin
-
-# Major Release für beide Skripte (Breaking Changes)
-./release.sh major
-
-# Patch Release für beide Skripte (Standard wenn script leer)
+# Patch Release (Bugfix)
 ./release.sh patch
+
+# Minor Release (new features)
+./release.sh minor
+
+# Major Release (Breaking Changes)
+./release.sh major
 ```
 
-### Release-Typen
+### Release Types
 
 **Patch Release (`patch`):**
-- Für Bugfixes und kleine Korrekturen
-- Inkrementiert Patch-Version: `1.1.0` → `1.1.1`
+- For bugfixes and small corrections
+- Increments patch version: `1.1.0` → `1.1.1`
 
 **Minor Release (`minor`):**
-- Für neue Features, abwärtskompatibel
-- Inkrementiert Minor-Version: `1.1.0` → `1.2.0`
+- For new features, backward compatible
+- Increments minor version: `1.1.0` → `1.2.0`
 
 **Major Release (`major`):**
-- Für Breaking Changes
-- Inkrementiert Major-Version: `1.1.0` → `2.0.0`
+- For breaking changes
+- Increments major version: `1.1.0` → `2.0.0`
 
-## Release-Workflow
+## Release Workflow
 
-### Automatischer Ablauf
+### Automatic Process
 
-Das `release.sh` Script führt folgende Schritte automatisch aus:
+The `release.sh` script automatically executes the following steps:
 
 1. **Pre-Release Checks**
-   - Prüft ob Git Repository vorhanden ist
-   - Prüft ob Working Directory sauber ist
-   - Prüft ob Remote origin konfiguriert ist
-   - Prüft ob beide Skripte vorhanden sind
+   - Checks if Git repository exists
+   - Checks if working directory is clean
+   - Checks if remote origin is configured
+   - Checks if the script exists
 
-2. **Versionsnummer bestimmen**
-   - Liest aktuelle Version aus Skript-Header (`# Version: X.Y.Z`)
-   - Inkrementiert basierend auf Release-Typ
-   - Zeigt Versionsänderung an
+2. **Determine Version Number**
+   - Reads current version from script header (`# Version: X.Y.Z`)
+   - Increments based on release type
+   - Displays version change
 
-3. **Changelog generieren**
-   - Analysiert Git-Commits seit letztem Release-Tag
-   - Gruppiert Commits nach Typ (feat, fix, docs, etc.)
-   - Erstellt strukturierte Changelog-Nachricht
+3. **Generate Changelog**
+   - Analyzes Git commits since last release tag
+   - Groups commits by type (feat, fix, docs, etc.)
+   - Creates structured changelog message
 
-4. **Versionsnummer aktualisieren**
-   - Aktualisiert `# Version: X.Y.Z` im Skript-Header
-   - Erstellt Backup vor Änderung
-   - Validiert neue Versionsnummer
+4. **Update Version Number**
+   - Updates `# Version: X.Y.Z` in script header
+   - Creates backup before change
+   - Validates new version number
 
-5. **SHA256-Hash generieren**
-   - Berechnet SHA256-Hash für aktualisierte Skripte
-   - Schreibt Hash in entsprechende `.sha256` Dateien
-   - Unterstützt sowohl macOS (`shasum`) als auch Linux (`sha256sum`)
+5. **Generate SHA256 Hash**
+   - Calculates SHA256 hash for updated scripts
+   - Writes hash to corresponding `.sha256` files
+   - Supports both macOS (`shasum`) and Linux (`sha256sum`)
 
-6. **Git-Commit erstellen**
-   - Staged geänderte Dateien (Skripte + Hash-Dateien)
-   - Erstellt Commit mit Message: `Release vX.Y.Z`
+6. **Create Git Commit**
+   - Stages changed files (scripts + hash files)
+   - Creates commit with message: `Release vX.Y.Z`
 
-7. **Git-Tag erstellen**
-   - Erstellt annotierten Tag: `vX.Y.Z`
-   - Tag-Message enthält vollständigen Changelog
+7. **Create Git Tag**
+   - Creates annotated tag: `vX.Y.Z`
+   - Tag message contains full changelog
 
-8. **Push zu Origin**
-   - Pusht Commits zu `origin main` (oder `master`)
-   - Pusht Tag zu `origin`
+8. **Push to Origin**
+   - Pushes commits to `origin main` (or `master`)
+   - Pushes tag to `origin`
 
-9. **Success-Message**
-   - Zeigt Zusammenfassung des Releases
-   - Gibt Anweisungen für Benutzer zum Upgrade
+9. **Success Message**
+   - Displays release summary
+   - Provides upgrade instructions for users
 
-### Manueller Workflow (ohne Script)
+### Manual Workflow (without script)
 
-Falls das Script nicht verwendet werden kann, kann der Release manuell erstellt werden:
+If the script cannot be used, the release can be created manually:
 
 ```bash
-# 1. Versionsnummer im Skript-Header aktualisieren
-# In dev.sh oder admin.sh: # Version: 1.1.0 → # Version: 1.1.1
+# 1. Update version number in script header
+# In dev.sh: # Version: 1.1.0 → # Version: 1.1.1
 
-# 2. SHA256-Hash generieren
+# 2. Generate SHA256 hash
 shasum -a 256 dev.sh > dev.sh.sha256
-shasum -a 256 admin.sh > admin.sh.sha256
 
-# 3. Git-Commit erstellen
-git add dev.sh admin.sh dev.sh.sha256 admin.sh.sha256
+# 3. Create Git commit
+git add dev.sh dev.sh.sha256
 git commit -m "Release v1.1.1"
 
-# 4. Git-Tag erstellen
+# 4. Create Git tag
 git tag -a v1.1.1 -m "Release v1.1.1"
 
 # 5. Push
@@ -132,72 +127,68 @@ git push origin main
 git push origin v1.1.1
 ```
 
-## Upgrade-Mechanismus
+## Upgrade Mechanism
 
-### Wie funktioniert `upgrade`?
+### How does `upgrade` work?
 
-Die `upgrade` Funktion in beiden Skripten funktioniert folgendermaßen:
+The `upgrade` function in the script works as follows:
 
-1. **Versionsnummer lesen**
-   - Liest aktuelle Version aus Skript-Header: `# Version: 1.1.0`
-   - Lädt neueste Version vom GitHub Repository
+1. **Read Version Number**
+   - Reads current version from script header: `# Version: 1.1.0`
+   - Loads latest version from GitHub repository
 
-2. **Vergleich**
-   - Vergleicht aktuelle mit neuer Version
-   - Wenn gleich → bereits aktuell
-   - Wenn unterschiedlich → Update verfügbar
+2. **Compare**
+   - Compares current with new version
+   - If equal → already up to date
+   - If different → update available
 
 3. **Download**
-   - Lädt neue Skript-Version: `https://raw.githubusercontent.com/akaw/dev/main/dev.sh`
-   - Lädt SHA256-Hash: `https://raw.githubusercontent.com/akaw/dev/main/dev.sh.sha256`
+   - Downloads new script version: `https://raw.githubusercontent.com/akaw/dev/main/dev.sh`
+   - Downloads SHA256 hash: `https://raw.githubusercontent.com/akaw/dev/main/dev.sh.sha256`
 
-4. **Verifizierung**
-   - Berechnet SHA256-Hash der heruntergeladenen Datei
-   - Vergleicht mit erwartetem Hash
-   - Bei Mismatch → Fehler, Update wird nicht installiert
+4. **Verification**
+   - Calculates SHA256 hash of downloaded file
+   - Compares with expected hash
+   - On mismatch → error, update is not installed
 
 5. **Installation**
-   - Erstellt Backup der aktuellen Version
-   - Installiert neue Version
-   - Setzt ausführbare Berechtigungen
+   - Creates backup of current version
+   - Installs new version
+   - Sets executable permissions
 
-### Benutzer-Upgrade
+### User Upgrade
 
-Benutzer können ihre Skripte aktualisieren mit:
+Users can update the script with:
 
 ```bash
-# dev.sh aktualisieren
 dev upgrade
-
-# admin.sh aktualisieren
-admin upgrade
 ```
 
 ## Best Practices
 
-### Wann welchen Release-Typ verwenden?
+### When to use which release type?
 
 **Patch Release:**
 - Bugfixes
-- Kleine Korrekturen
-- Dokumentations-Updates
-- Performance-Verbesserungen ohne API-Änderungen
+- Small corrections
+- Documentation updates
+- Performance improvements without API changes
 
 **Minor Release:**
-- Neue Features
-- Neue Kommandos hinzufügen
-- Abwärtskompatible Änderungen
-- Verbesserungen bestehender Funktionen
+- New features
+- Adding new commands
+- Backward compatible changes
+- Improvements to existing functions
 
 **Major Release:**
-- Breaking Changes
-- Entfernen von Kommandos
-- Änderungen an bestehenden Kommandos die nicht abwärtskompatibel sind
-- Große Umstrukturierungen
+- Breaking changes
+- Removing commands
+- Changes to existing commands that are not backward compatible
+- Major restructuring
 
-### Commit-Messages
+### Commit Messages
 
-Verwende konventionelle Commit-Messages für bessere Changelog-Generierung:
+Use conventional commit messages for better changelog generation:
 
 ```
 feat: Add new command for cache clearing
@@ -206,85 +197,84 @@ docs: Update README with new examples
 chore: Update dependencies
 ```
 
-### Release-Frequenz
+### Release Frequency
 
-- **Patch Releases**: So oft wie nötig (Bugfixes)
-- **Minor Releases**: Regelmäßig bei neuen Features
-- **Major Releases**: Sparsam, nur bei Breaking Changes
+- **Patch Releases**: As often as needed (bugfixes)
+- **Minor Releases**: Regularly with new features
+- **Major Releases**: Sparingly, only for breaking changes
 
-### Vor dem Release
+### Before Release
 
-- [ ] Alle Änderungen getestet
-- [ ] Working Directory sauber (keine uncommitted changes)
-- [ ] Git Repository auf neuestem Stand
-- [ ] Beide Skripte funktionieren korrekt
-- [ ] Versionsnummern sind konsistent
+- [ ] All changes tested
+- [ ] Working directory clean (no uncommitted changes)
+- [ ] Git repository up to date
+- [ ] Script works correctly
+- [ ] Version number is correct
 
 ## Troubleshooting
 
 ### "Working directory has uncommitted changes"
 
-**Problem:** Es gibt uncommitted Änderungen im Repository.
+**Problem:** There are uncommitted changes in the repository.
 
-**Lösung:**
+**Solution:**
 ```bash
-# Änderungen committen
+# Commit changes
 git add .
 git commit -m "Your commit message"
 
-# Oder Änderungen stashen
+# Or stash changes
 git stash
 ```
 
 ### "Failed to push commits"
 
-**Problem:** Push zu origin schlägt fehl.
+**Problem:** Push to origin fails.
 
-**Lösung:**
-- Prüfe ob Remote origin korrekt konfiguriert ist: `git remote -v`
-- Prüfe ob du Push-Berechtigung hast
-- Prüfe ob der Branch korrekt ist (main/master)
+**Solution:**
+- Check if remote origin is correctly configured: `git remote -v`
+- Check if you have push permissions
+- Check if the branch is correct (main/master)
 
 ### "Failed to generate SHA256 hash"
 
-**Problem:** SHA256-Hash kann nicht generiert werden.
+**Problem:** SHA256 hash cannot be generated.
 
-**Lösung:**
-- Prüfe ob `shasum` (macOS) oder `sha256sum` (Linux) installiert ist
-- Prüfe ob die Skript-Dateien existieren und lesbar sind
+**Solution:**
+- Check if `shasum` (macOS) or `sha256sum` (Linux) is installed
+- Check if script files exist and are readable
 
 ### "Invalid version format"
 
-**Problem:** Versionsnummer hat falsches Format.
+**Problem:** Version number has incorrect format.
 
-**Lösung:**
-- Versionsnummer muss Format `major.minor.patch` haben (z.B. `1.2.3`)
-- Prüfe ob Versionsnummer im Skript-Header korrekt ist: `# Version: 1.1.0`
+**Solution:**
+- Version number must have format `major.minor.patch` (e.g. `1.2.3`)
+- Check if version number in script header is correct: `# Version: 1.1.0`
 
-### Upgrade funktioniert nicht
+### Upgrade doesn't work
 
-**Problem:** Benutzer können nicht upgraden.
+**Problem:** Users cannot upgrade.
 
-**Lösung:**
-- Prüfe ob Git-Tag korrekt gepusht wurde: `git push origin vX.Y.Z`
-- Prüfe ob SHA256-Hash-Datei im Repository ist und korrekt ist
-- Prüfe ob GitHub Repository öffentlich zugänglich ist
-- Prüfe ob Versionsnummer im Skript-Header korrekt ist
+**Solution:**
+- Check if Git tag was correctly pushed: `git push origin vX.Y.Z`
+- Check if SHA256 hash file is in repository and is correct
+- Check if GitHub repository is publicly accessible
+- Check if version number in script header is correct
 
-## Datei-Struktur
+## File Structure
 
 ```
 .
-├── dev.sh                    # Hauptskript für lokale Entwicklung
-├── admin.sh                  # Hauptskript für Webserver/Produktion
-├── dev.sh.sha256             # SHA256-Hash für dev.sh (wird bei Release generiert)
-├── admin.sh.sha256           # SHA256-Hash für admin.sh (wird bei Release generiert)
-├── release.sh                # Release-Management-Script
-├── RELEASE.md                # Diese Dokumentation
-└── CHANGELOG.md              # Optional: Automatisch generiertes Changelog
+├── dev.sh                    # Main script for local development
+├── dev.sh.sha256             # SHA256 hash for dev.sh (generated on release)
+├── release.sh                # Release management script
+├── docs/
+│   └── RELEASE.md            # This documentation
+└── CHANGELOG.md              # Optional: Automatically generated changelog
 ```
 
-## Weitere Informationen
+## Further Information
 
 - Repository: https://github.com/akaw/dev/
 - Issues: https://github.com/akaw/dev/issues
@@ -292,4 +282,4 @@ git stash
 
 ## Version
 
-Diese Dokumentation beschreibt die Release-Strategie Version 1.0.0.
+This documentation describes release strategy version 1.0.0.

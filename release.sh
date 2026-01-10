@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 
 # release.sh
-# Release management script for dev.sh and admin.sh
-# Usage: ./release.sh [type] [script]
+# Release management script for dev.sh
+# Usage: ./release.sh [type]
 #   type: patch, minor, major
-#   script: dev, admin, or empty (both)
 #
 # Author: Andre Witte
 # Version: 1.0.0
@@ -24,9 +23,7 @@ NC='\033[0m' # No Color
 
 # Script files
 DEV_SCRIPT="dev.sh"
-ADMIN_SCRIPT="admin.sh"
 DEV_HASH="dev.sh.sha256"
-ADMIN_HASH="admin.sh.sha256"
 
 # Hilfsfunktion: Liest aktuelle Versionsnummer aus Skript-Header
 _get_current_version() {
@@ -196,14 +193,9 @@ _check_release_prerequisites() {
         echo -e "${YELLOW}Warning: No remote 'origin' configured${NC}" >&2
     fi
     
-    # Prüfe ob Skripte existieren
+    # Prüfe ob Skript existiert
     if [[ ! -f "$DEV_SCRIPT" ]]; then
         echo -e "${RED}Error: $DEV_SCRIPT not found${NC}" >&2
-        errors=$((errors + 1))
-    fi
-    
-    if [[ ! -f "$ADMIN_SCRIPT" ]]; then
-        echo -e "${RED}Error: $ADMIN_SCRIPT not found${NC}" >&2
         errors=$((errors + 1))
     fi
     
@@ -277,7 +269,6 @@ _generate_changelog() {
 # Hauptfunktion: Erstellt Release
 _create_release() {
     local release_type="$1"
-    local target_script="$2"
     
     echo -e "${BLUE}=== Release Process Started ===${NC}\n"
     
@@ -289,59 +280,24 @@ _create_release() {
     fi
     echo -e "${GREEN}Pre-release checks passed${NC}\n"
     
-    # Bestimme welche Skripte aktualisiert werden sollen
-    local scripts_to_update=()
+    # Bestimme aktuelle und neue Versionsnummer
+    local current_version=$(_get_current_version "$DEV_SCRIPT")
+    if [[ -z "$current_version" ]]; then
+        echo -e "${RED}Error: Could not determine current version for $DEV_SCRIPT${NC}" >&2
+        return 1
+    fi
     
-    case "$target_script" in
-        dev)
-            scripts_to_update=("$DEV_SCRIPT")
-            ;;
-        admin)
-            scripts_to_update=("$ADMIN_SCRIPT")
-            ;;
-        ""|both|all)
-            scripts_to_update=("$DEV_SCRIPT" "$ADMIN_SCRIPT")
-            ;;
-        *)
-            echo -e "${RED}Error: Invalid script name: $target_script${NC}" >&2
-            echo "Valid options: dev, admin, or empty (both)" >&2
-            return 1
-            ;;
-    esac
+    local new_version=$(_increment_version "$current_version" "$release_type")
+    if [[ -z "$new_version" ]]; then
+        echo -e "${RED}Error: Failed to increment version${NC}" >&2
+        return 1
+    fi
     
-    # Bestimme neue Versionsnummern für alle Skripte
-    # Verwende parallele Arrays statt associative arrays für Kompatibilität
-    local new_versions=()
-    local current_versions=()
-    
-    for script in "${scripts_to_update[@]}"; do
-        local current_version=$(_get_current_version "$script")
-        if [[ -z "$current_version" ]]; then
-            echo -e "${RED}Error: Could not determine current version for $script${NC}" >&2
-            return 1
-        fi
-        
-        current_versions+=("$current_version")
-        local new_version=$(_increment_version "$current_version" "$release_type")
-        
-        if [[ -z "$new_version" ]]; then
-            echo -e "${RED}Error: Failed to increment version for $script${NC}" >&2
-            return 1
-        fi
-        
-        new_versions+=("$new_version")
-        
-        echo -e "${BLUE}$script:${NC} ${current_version} -> ${GREEN}${new_version}${NC} (${release_type})"
-    done
-    
+    echo -e "${BLUE}$DEV_SCRIPT:${NC} ${current_version} -> ${GREEN}${new_version}${NC} (${release_type})"
     echo ""
     
-    # Verwende die erste neue Version für Tag (oder beide wenn unterschiedlich)
-    local tag_version="${new_versions[0]}"
-    
     # Generiere Changelog
-    local oldest_current_version="${current_versions[0]}"
-    local changelog=$(_generate_changelog "$oldest_current_version" "$tag_version" "$release_type")
+    local changelog=$(_generate_changelog "$current_version" "$new_version" "$release_type")
     
     echo -e "${BLUE}Changelog:${NC}"
     echo -e "$changelog"
@@ -352,7 +308,7 @@ _create_release() {
     echo "  1. Update version numbers in script files"
     echo "  2. Generate SHA256 hash files"
     echo "  3. Create git commit"
-    echo "  4. Create git tag v${tag_version}"
+    echo "  4. Create git tag v${new_version}"
     echo "  5. Push to origin"
     echo ""
     read -p "Continue? (y/N): " -n 1 -r
@@ -362,51 +318,27 @@ _create_release() {
         return 1
     fi
     
-    # Aktualisiere Versionsnummern
-    echo -e "\n${BLUE}Updating version numbers...${NC}"
-    local idx=0
-    for script in "${scripts_to_update[@]}"; do
-        if ! _update_script_version "$script" "${new_versions[$idx]}"; then
-            echo -e "${RED}Error: Failed to update version in $script${NC}" >&2
-            return 1
-        fi
-        idx=$((idx + 1))
-    done
+    # Aktualisiere Versionsnummer
+    echo -e "\n${BLUE}Updating version number...${NC}"
+    if ! _update_script_version "$DEV_SCRIPT" "$new_version"; then
+        echo -e "${RED}Error: Failed to update version in $DEV_SCRIPT${NC}" >&2
+        return 1
+    fi
     
-    # Generiere SHA256-Hashes
-    echo -e "\n${BLUE}Generating SHA256 hashes...${NC}"
-    for script in "${scripts_to_update[@]}"; do
-        local hash_file
-        if [[ "$script" == "$DEV_SCRIPT" ]]; then
-            hash_file="$DEV_HASH"
-        else
-            hash_file="$ADMIN_HASH"
-        fi
-        
-        if ! _generate_sha256_hash "$script" "$hash_file"; then
-            echo -e "${RED}Error: Failed to generate hash for $script${NC}" >&2
-            return 1
-        fi
-    done
+    # Generiere SHA256-Hash
+    echo -e "\n${BLUE}Generating SHA256 hash...${NC}"
+    if ! _generate_sha256_hash "$DEV_SCRIPT" "$DEV_HASH"; then
+        echo -e "${RED}Error: Failed to generate hash${NC}" >&2
+        return 1
+    fi
     
     # Git Commit
     echo -e "\n${BLUE}Creating git commit...${NC}"
-    local commit_message="Release v${tag_version}"
+    local commit_message="Release v${new_version}"
     
     # Stage geänderte Dateien
-    for script in "${scripts_to_update[@]}"; do
-        git add "$script"
-    done
-    
-    for script in "${scripts_to_update[@]}"; do
-        local hash_file
-        if [[ "$script" == "$DEV_SCRIPT" ]]; then
-            hash_file="$DEV_HASH"
-        else
-            hash_file="$ADMIN_HASH"
-        fi
-        git add "$hash_file"
-    done
+    git add "$DEV_SCRIPT"
+    git add "$DEV_HASH"
     
     if ! git commit -m "$commit_message"; then
         echo -e "${RED}Error: Failed to create git commit${NC}" >&2
@@ -415,11 +347,11 @@ _create_release() {
     
     # Git Tag
     echo -e "\n${BLUE}Creating git tag...${NC}"
-    local tag_message="Release v${tag_version}
+    local tag_message="Release v${new_version}
 
 ${changelog}"
     
-    if ! git tag -a "v${tag_version}" -m "$tag_message"; then
+    if ! git tag -a "v${new_version}" -m "$tag_message"; then
         echo -e "${RED}Error: Failed to create git tag${NC}" >&2
         return 1
     fi
@@ -435,33 +367,23 @@ ${changelog}"
         }
     fi
     
-    if ! git push origin "v${tag_version}"; then
+    if ! git push origin "v${new_version}"; then
         echo -e "${RED}Error: Failed to push tag${NC}" >&2
         return 1
     fi
     
     # Success
     echo -e "\n${GREEN}=== Release Successful ===${NC}"
-    echo -e "${GREEN}Released version: v${tag_version}${NC}"
+    echo -e "${GREEN}Released version: v${new_version}${NC}"
     echo ""
-    echo "Updated scripts:"
-    local idx=0
-    for script in "${scripts_to_update[@]}"; do
-        echo "  - $script: ${current_versions[$idx]} -> ${new_versions[$idx]}"
-        idx=$((idx + 1))
-    done
+    echo "Updated script:"
+    echo "  - $DEV_SCRIPT: ${current_version} -> ${new_version}"
     echo ""
-    echo "Tag: v${tag_version}"
+    echo "Tag: v${new_version}"
     echo "Commit: $(git rev-parse HEAD)"
     echo ""
     echo "Users can now update with:"
-    for script in "${scripts_to_update[@]}"; do
-        if [[ "$script" == "$DEV_SCRIPT" ]]; then
-            echo "  dev upgrade"
-        else
-            echo "  admin upgrade"
-        fi
-    done
+    echo "  dev upgrade"
     
     return 0
 }
@@ -469,25 +391,23 @@ ${changelog}"
 # Hauptfunktion: Zeigt Hilfe
 _show_help() {
     cat << EOF
-Release Management Script for dev.sh and admin.sh
+Release Management Script for dev.sh
 
-Usage: ./release.sh [type] [script]
+Usage: ./release.sh [type]
 
 Arguments:
   type          Release type: patch, minor, or major
-  script        Script to release: dev, admin, or empty (both)
 
 Examples:
-  ./release.sh patch dev      Create patch release for dev.sh
-  ./release.sh minor admin    Create minor release for admin.sh
-  ./release.sh major          Create major release for both scripts
-  ./release.sh patch          Create patch release for both scripts
+  ./release.sh patch      Create patch release
+  ./release.sh minor      Create minor release
+  ./release.sh major      Create major release
 
 Release Process:
   1. Pre-release checks (git repo, clean working directory)
-  2. Determine new version numbers
-  3. Update version numbers in script headers
-  4. Generate SHA256 hash files
+  2. Determine new version number
+  3. Update version number in script header
+  4. Generate SHA256 hash file
   5. Create git commit
   6. Create git tag with changelog
   7. Push to origin
@@ -498,7 +418,6 @@ EOF
 # Main
 main() {
     local release_type="$1"
-    local target_script="${2:-}"
     
     # Validiere Release-Typ
     case "$release_type" in
@@ -517,7 +436,7 @@ main() {
     esac
     
     # Erstelle Release
-    if _create_release "$release_type" "$target_script"; then
+    if _create_release "$release_type"; then
         exit 0
     else
         exit 1
