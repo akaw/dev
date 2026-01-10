@@ -42,7 +42,7 @@ if [[ -n "$CURRENT_PATH" ]]; then
 else
     # ask for current path
     echo "Please set the current project path to the .bashrc or .zshrc file."
-    echo "or run the command 'set:current' to set the current project path to the current directory."
+    echo "or run the command 'set:current' to temporarily set the current project path (only for this shell session)."
     echo "Example: set:current"
     echo "Example: set:current /var/www/project/current/"
 fi
@@ -291,28 +291,11 @@ _set_current_path_interactive() {
     fi
 
     export CURRENT_PATH="$new_path"
-    echo "CURRENT_PATH path set to $CURRENT_PATH"
+    echo "CURRENT_PATH path set to $CURRENT_PATH (temporarily for this shell session)"
 
-    # Persist to shell config file
-    local rc_file
-    if [ -f ~/.bashrc ]; then
-        rc_file=~/.bashrc
-    elif [ -f ~/.zshrc ]; then
-        rc_file=~/.zshrc
-    else
-        echo "~/.bashrc or ~/.zshrc not found"
-        echo "Please create the file and add the following line:"
-        echo "export CURRENT_PATH=\"$CURRENT_PATH\""
-        return 1
-    fi
-
-    if grep -q "export CURRENT_PATH=" "$rc_file"; then
-        # Update existing export line
-        sed -i.bak '/export CURRENT_PATH=/c\export CURRENT_PATH="'"$CURRENT_PATH"'"' "$rc_file"
-        echo "Updated CURRENT_PATH in $rc_file"
-    else
-        echo "Adding CURRENT_PATH to $rc_file"
-        echo "export CURRENT_PATH=\"$CURRENT_PATH\"" >> "$rc_file"
+    # Update current alias
+    if [[ -n "$CURRENT_PATH" ]]; then
+        alias current="cd \"$CURRENT_PATH\""
     fi
 
     return 0
@@ -487,7 +470,7 @@ admin() {
             echo "  logs:tail, tl, lo:ta       - Tail Symfony logs"
             echo ""
             echo "Other:"
-            echo "  set:current, se:cu, sc     - Set CURRENT_PATH path"
+            echo "  set:current, se:cu, sc     - Set CURRENT_PATH path temporarily (for current shell session)"
             echo "  reload                     - Reload admin environment"
             echo "  upgrade                    - Upgrade admin script to latest version"
             echo "  -h, --help                 - Show this help"

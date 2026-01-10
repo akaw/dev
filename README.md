@@ -20,7 +20,7 @@ Dieses Repository enthält zwei Hauptskripte:
 ### dev.sh (Lokale Entwicklung)
 
 1. Repository klonen
-2. Skript ausführbar machen:
+2. **(Optional)** Skript ausführbar machen (beim Sourcing nicht technisch erforderlich, aber empfohlen):
    ```bash
    chmod +x dev.sh
    ```
@@ -35,23 +35,25 @@ Dieses Repository enthält zwei Hauptskripte:
    dev [command]
    ```
 
+**Hinweis:** Beim Sourcing wird das Skript nicht als ausführbares Programm gestartet, sondern direkt in die Shell geladen. Daher ist `chmod +x` technisch nicht erforderlich, aber wird als gute Praxis empfohlen.
+
 ### admin.sh (Server-Management)
 
 **Wichtig:** Das Skript muss am Ende der `.bashrc` gesourced werden, damit Umgebungsvariablen bereits gesetzt sind.
 
 1. Skript auf den Server kopieren (z.B. nach `/root/bin/admin.sh`)
-2. Ausführbar machen:
+2. **(Optional)** Ausführbar machen (beim Sourcing nicht technisch erforderlich, aber empfohlen):
    ```bash
    chmod +x /root/bin/admin.sh
    ```
-3. In `.bashrc` am Ende einbinden (nach den Export-Zeilen!):
+3. In `.bashrc` am Ende einbinden (nach der CURRENT_PATH Variable!):
    ```bash
-   export DEPLOY_PATH=/var/www/example.com/deploy
-   export DEPLOY_USER=deploy
-   export WEB_USER=www-data
+   # CURRENT_PATH setzen (erforderlich für admin.sh)
+   export CURRENT_PATH=/var/www/example.com/deploy/current
    
-   export CURRENT_PATH=$DEPLOY_PATH/current
-   export SHARED_PATH=$DEPLOY_PATH/shared
+   # Oder mit Variablen-Expansion:
+   # export DEPLOY_PATH=/var/www/example.com/deploy
+   # export CURRENT_PATH=$DEPLOY_PATH/current
    
    # admin.sh am Ende sourcen
    if [ -f /root/bin/admin.sh ]; then
@@ -63,19 +65,30 @@ Dieses Repository enthält zwei Hauptskripte:
    admin [command]
    ```
 
-**Hinweis:** Die Reihenfolge ist wichtig! Die Export-Zeilen müssen vor dem Sourcing von `admin.sh` stehen, damit `CURRENT_PATH` korrekt gesetzt ist.
+**Hinweis:** Die Reihenfolge ist wichtig! `CURRENT_PATH` muss vor dem Sourcing von `admin.sh` gesetzt werden, damit das Skript korrekt funktioniert.
 
 ## Umgebungsvariablen (admin.sh)
 
-Folgende Variablen sollten in `.bashrc` gesetzt werden:
+Für die Nutzung von `admin.sh` ist **nur `CURRENT_PATH` erforderlich**. Diese Variable sollte in `.bashrc` gesetzt werden:
 
-- `DEPLOY_PATH` - Basis-Pfad für Deployments (z.B. `/var/www/example.com/deploy`)
-- `DEPLOY_USER` - Benutzer für Deployments (z.B. `deploy`)
-- `WEB_USER` - Web-Server-Benutzer (z.B. `www-data`)
-- `CURRENT_PATH` - Pfad zum aktuellen Deployment (z.B. `$DEPLOY_PATH/current`)
-- `SHARED_PATH` - Pfad für gemeinsam genutzte Dateien (z.B. `$DEPLOY_PATH/shared`)
+- `CURRENT_PATH` - Pfad zum aktuellen Deployment (z.B. `/var/www/example.com/deploy/current`)
 
-Das Skript erstellt automatisch ein `current`-Alias, das zu `CURRENT_PATH` navigiert.
+Das Skript verwendet `CURRENT_PATH` für alle Symfony-Befehle (Cache, Console, Messenger, Logs, etc.).
+
+**Beispiel in `.bashrc`:**
+```bash
+export CURRENT_PATH=/var/www/example.com/deploy/current
+```
+
+Oder mit Variablen-Expansion:
+```bash
+export DEPLOY_PATH=/var/www/example.com/deploy
+export CURRENT_PATH=$DEPLOY_PATH/current
+```
+
+**Hinweis:** Die Variablen `DEPLOY_PATH`, `DEPLOY_USER`, `WEB_USER` und `SHARED_PATH` werden von `admin.sh` **nicht verwendet**. Sie können jedoch für andere Deployment-Skripte oder Tools nützlich sein.
+
+Das Skript erstellt automatisch ein `current`-Alias, das zu `CURRENT_PATH` navigiert, wenn die Variable gesetzt ist.
 
 ## Upgrade
 
@@ -103,12 +116,19 @@ Beide Skripte sind als Shell-Funktionen konzipiert und sollten via `source` in `
 - ✅ Alias-Support: Kann Aliasse definieren (z.B. `current`-Alias in admin.sh)
 - ✅ Shell-Variablen: Direkter Zugriff auf Shell-Variablen wie `CURRENT_PATH`
 - ✅ Kein Subshell-Overhead bei jedem Aufruf
+- ✅ Kein `chmod +x` erforderlich: Beim Sourcing wird das Skript direkt in die Shell geladen, nicht als ausführbares Programm gestartet
 
 **PATH-basierte Installation wäre:**
 - ❌ Langsamer (Subshell bei jedem Aufruf)
 - ❌ Kann keine Shell-Funktionen/Aliasse direkt definieren
 - ❌ Completion muss anders konfiguriert werden
 - ❌ Mehr Isolation, aber weniger Shell-Integration
+- ❌ Benötigt `chmod +x` und Shebang (`#!/bin/bash`)
+
+**Wichtig beim Sourcing:**
+- Das Skript wird nicht als ausführbares Programm gestartet, sondern direkt in die Shell geladen
+- Daher ist `chmod +x` **technisch nicht erforderlich**, wird aber als gute Praxis empfohlen
+- Das Shebang (`#!/bin/bash`) wird beim Sourcing ignoriert, aber schadet auch nicht
 
 **Fazit:** Für interaktive Shell-Tools wie `dev` und `admin` ist **Sourcing die empfohlene Methode**.
 
@@ -215,23 +235,20 @@ Befehle für Production-Server-Management mit Apache, Supervisor, Certbot und Sy
 - `logs:tail`, `tl`, `lo:ta` - Tail Symfony logs
 
 #### Other
-- `set:current`, `se:cu`, `sc` - Set CURRENT_PATH path interactively
+- `set:current`, `se:cu`, `sc` - Set CURRENT_PATH path temporarily for the current shell session (for switching between different web projects)
 - `reload` - Reload admin environment
 - `upgrade` - Upgrade script to latest version
 - `-h`, `--help` - Show help message
 
 **Hinweis:** Viele Befehle benötigen `sudo`-Rechte. Stellen Sie sicher, dass Sie die entsprechenden Berechtigungen haben.
 
+**Hinweis zu `set:current`:** Dieser Befehl setzt `CURRENT_PATH` nur **temporär** für die aktuelle Shell-Session. Nach dem Schließen der Shell ist der Wert weg. Für eine dauerhafte Konfiguration muss `CURRENT_PATH` manuell in `.bashrc` gesetzt werden (siehe Installation oben).
+
 **Alias:** Das Skript erstellt automatisch ein `current`-Alias, das zu `CURRENT_PATH` navigiert, wenn die Variable gesetzt ist.
-
-## Version
-
-- dev.sh: 1.2.6
-- admin.sh: 1.2.6
 
 ## Author
 
-Andre Witte
+Andre Witte and cursor
 
 ## Repository
 
