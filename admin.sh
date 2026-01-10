@@ -51,6 +51,9 @@ fi
 _upgrade() {
     local script_path="${1:-}"
     
+    # ===========================
+    # 1. Determine Script Path
+    # ===========================
     # If path provided as argument, use it
     if [[ -n "$script_path" && -f "$script_path" ]]; then
         # Use provided path
@@ -126,32 +129,35 @@ _upgrade() {
         script_path=$(cd "$(dirname "$script_path")" && pwd)/$(basename "$script_path")
     fi
     
+    # ===========================
+    # 2. Check for Updates
+    # ===========================
     echo "[INFO] Checking for updates..."
 
     # Temporary files for downloads
     local temp_script="/tmp/admin_new_version"
     local temp_hash="/tmp/admin_new_version.sha256"
 
-    # Check current version against latest version first
+    # Fetch latest version from GitHub
     local latest_version
-    # Fetch raw remote file first so we can diagnose parsing failures
-    local raw_remote
-    raw_remote=$(curl -s -m 5 "https://raw.githubusercontent.com/akaw/dev/main/admin.sh" || true)
-    latest_version=$(printf "%s" "$raw_remote" | grep -m 1 "^# Version:" | awk '{print $NF}' || true)
-    if [[ -z "$raw_remote" ]]; then
-        echo "[ERROR] Could not fetch remote file. Please check your internet connection." >&2
+    if ! latest_version=$(curl -s -m 5 "https://raw.githubusercontent.com/akaw/dev/main/admin.sh" | grep -m 1 "^# Version:" | awk '{print $NF}'); then
+        echo "[ERROR] Could not check for updates. Please check your internet connection." >&2
         echo "[INFO] Possible solutions:" >&2
         echo "[INFO]   - Check your internet connection" >&2
         echo "[INFO]   - Verify firewall settings" >&2
         echo "[INFO]   - Try again later" >&2
         return 1
     fi
+    
     if [[ -z "$latest_version" ]]; then
         echo "[ERROR] Could not determine latest version from server." >&2
         return 1
     fi
     
-    # Validate version format and determine current version
+    # ===========================
+    # 3. Validate Version Format
+    # ===========================
+    # Validate version format
     if [[ ! "$latest_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         echo "[ERROR] Invalid version format received from server: $latest_version" >&2
         return 1
@@ -165,15 +171,20 @@ _upgrade() {
         current_version="0.0.0"
     fi
 
+    # Check if update is needed
     if [[ "$latest_version" == "$current_version" ]]; then
         echo "[INFO] You already have the latest version ($current_version)."
         return 0
     fi
 
     echo "[INFO] New version found: $latest_version (current: $current_version)"
+    
+    # ===========================
+    # 4. Download Update Files
+    # ===========================
     echo "[INFO] Downloading update..."
 
-    # Download new version with better error handling
+    # Download new version and hash file with better error handling
     if ! curl -s -o "$temp_script" "https://raw.githubusercontent.com/akaw/dev/main/admin.sh"; then
         echo "[ERROR] Download of new version failed" >&2
         echo "[INFO] Please check your internet connection and try again" >&2
@@ -200,7 +211,9 @@ _upgrade() {
         return 1
     fi
 
-    # Verify hash
+    # ===========================
+    # 5. Verify Hash
+    # ===========================
     local expected_hash
     expected_hash=$(cat "$temp_hash")
     local actual_hash
@@ -245,6 +258,12 @@ _upgrade() {
         return 1
     fi
 
+    # ===========================
+    # 6. Install Update
+    # ===========================
+    # Remove update marker to force version check on next run
+    rm -f "/tmp/admin_update_check_$(date +%Y%m%d)" 2>/dev/null
+
     # Create backup with error handling
     if ! cp "$script_path" "${script_path}.backup"; then
         echo "[ERROR] Failed to create backup of current script" >&2
@@ -252,10 +271,7 @@ _upgrade() {
         return 1
     fi
 
-    # Remove update marker to force version check on next run
-    rm -f "/tmp/admin_update_check_$(date +%Y%m%d)" 2>/dev/null
-
-    # Install new version
+    # Install new version with atomic operation
     if mv "$temp_script" "$script_path"; then
         if ! chmod +x "$script_path"; then
             echo "[ERROR] Failed to set executable permissions on updated script" >&2
@@ -289,6 +305,7 @@ _upgrade() {
         return 1
     fi
 
+    # Clean up backup file
     rm -f "${script_path}.backup"
     return 0
 }
