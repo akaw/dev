@@ -109,54 +109,114 @@ _create_release_tag() {
     return 0
 }
 
+# Helper function to determine script path (bash/zsh compatible)
+_get_script_path() {
+    local script_name="${1:-dev}"
+    local script_path=""
+    
+    # 1. Bash: Try all BASH_SOURCE indices
+    if [[ -n "${BASH_VERSION}" ]]; then
+        local idx=0
+        while [[ ${idx} -lt 10 ]]; do
+            local candidate="${BASH_SOURCE[$idx]}"
+            if [[ -n "$candidate" && -f "$candidate" ]]; then
+                # Verify it's actually our script by checking for Version marker
+                if grep -q "^# Version:" "$candidate" 2>/dev/null; then
+                    script_path="$candidate"
+                    break
+                fi
+            fi
+            ((idx++))
+        done
+    fi
+    
+    # 2. Zsh: Use special parameter expansion
+    if [[ -z "$script_path" && -n "${ZSH_VERSION}" ]]; then
+        # In zsh, ${(%):-%x} gives the source file
+        local candidate="${(%):-%x}"
+        if [[ -f "$candidate" ]] && grep -q "^# Version:" "$candidate" 2>/dev/null; then
+            script_path="$candidate"
+        fi
+        
+        # Alternative: Try $0 in zsh
+        if [[ -z "$script_path" && -f "$0" ]] && grep -q "^# Version:" "$0" 2>/dev/null; then
+            script_path="$0"
+        fi
+    fi
+    
+    # 3. Try command -v to find script in PATH
+    if [[ -z "$script_path" ]] && command -v "$script_name" >/dev/null 2>&1; then
+        local which_path=$(command -v "$script_name" 2>/dev/null)
+        if [[ -n "$which_path" && -f "$which_path" ]]; then
+            # Resolve symlinks if readlink is available
+            if command -v readlink >/dev/null 2>&1; then
+                script_path=$(readlink -f "$which_path" 2>/dev/null || readlink "$which_path" 2>/dev/null || echo "$which_path")
+            else
+                script_path="$which_path"
+            fi
+        fi
+    fi
+    
+    # 4. Try common installation locations
+    if [[ -z "$script_path" ]]; then
+        for path in ~/bin/${script_name}.sh "$HOME/bin/${script_name}.sh" /usr/local/bin/${script_name}.sh /opt/dev/${script_name}.sh; do
+            if [[ -f "$path" ]] && grep -q "^# Version:" "$path" 2>/dev/null; then
+                script_path="$path"
+                break
+            fi
+        done
+    fi
+    
+    # 5. Last fallback: Try $0 (works when script is executed directly)
+    if [[ -z "$script_path" && -n "$0" && "$0" != "-"* ]]; then
+        if [[ -f "$0" ]] && grep -q "^# Version:" "$0" 2>/dev/null; then
+            script_path="$0"
+        fi
+    fi
+    
+    # Return the path if found
+    if [[ -n "$script_path" ]]; then
+        echo "$script_path"
+        return 0
+    fi
+    
+    return 1
+}
+
+# Helper function to check if script was sourced
+_is_sourced() {
+    # Bash: Compare BASH_SOURCE and $0
+    if [[ -n "${BASH_VERSION}" ]]; then
+        [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 0
+    fi
+    
+    # Zsh: Check if script was sourced
+    if [[ -n "${ZSH_VERSION}" ]]; then
+        # In zsh, when sourced, $0 is usually the shell name or differs from script
+        [[ "${ZSH_EVAL_CONTEXT}" =~ :file$ ]] && return 0
+    fi
+    
+    return 1
+}
+
 # Function to upgrade the script
 _upgrade() {
     local script_path="${1:-}"
     
     # Determine script path if not provided
     if [[ -z "$script_path" || ! -f "$script_path" ]]; then
-        script_path=""
-        
-        # Try BASH_SOURCE array (most reliable for sourced scripts)
-        if [[ -n "${BASH_SOURCE[0]}" && -f "${BASH_SOURCE[0]}" ]]; then
-            script_path="${BASH_SOURCE[0]}"
-        elif [[ -n "${BASH_SOURCE[1]}" && -f "${BASH_SOURCE[1]}" ]]; then
-            script_path="${BASH_SOURCE[1]}"
-        fi
-        
-        # Try readlink on the function source (works when script is in PATH)
-        if [[ -z "$script_path" ]] && command -v dev >/dev/null 2>&1; then
-            local which_path=$(command -v dev 2>/dev/null)
-            if [[ -n "$which_path" && -f "$which_path" ]]; then
-                # Resolve symlinks
-                if command -v readlink >/dev/null 2>&1; then
-                    script_path=$(readlink -f "$which_path" 2>/dev/null || readlink "$which_path" 2>/dev/null || echo "$which_path")
-                else
-                    script_path="$which_path"
-                fi
-            fi
-        fi
-        
-        # Try common locations
-        if [[ -z "$script_path" || ! -f "$script_path" ]]; then
-            for path in ~/bin/dev.sh "$HOME/bin/dev.sh" /usr/local/bin/dev.sh /opt/dev/dev.sh; do
-                if [[ -f "$path" ]] && grep -q "^# Version:" "$path" 2>/dev/null; then
-                    script_path="$path"
-                    break
-                fi
-            done
-        fi
-        
-        # Try $0 as last fallback
-        if [[ -z "$script_path" || ! -f "$script_path" ]]; then
-            [[ -n "$0" && "$0" != "-"* && -f "$0" ]] && script_path="$0"
+        if ! script_path=$(_get_script_path "dev"); then
+            echo "[ERROR] Could not determine script path automatically." >&2
+            echo "[INFO] Tried: BASH_SOURCE (bash), %x expansion (zsh), command -v, common paths, \$0" >&2
+            echo "[INFO] Please specify manually: dev upgrade /path/to/dev.sh" >&2
+            return 1
         fi
     fi
     
     # Validate script path
     if [[ -z "$script_path" || ! -f "$script_path" ]]; then
         echo "[ERROR] Could not determine script path automatically." >&2
-        echo "[INFO] Tried: BASH_SOURCE, which/command -v, common paths, \$0" >&2
+        echo "[INFO] Tried: BASH_SOURCE (bash), %x expansion (zsh), command -v, common paths, \$0" >&2
         echo "[INFO] Please specify manually: dev upgrade /path/to/dev.sh" >&2
         return 1
     fi
@@ -245,8 +305,20 @@ _upgrade() {
         rm -f "$temp_hash"
         local new_version=$(grep -m 1 "^# Version:" "$script_path" 2>/dev/null | awk '{print $NF}')
         echo "[INFO] Update successful! New version: ${new_version:-unknown}"
-        echo "[INFO] Please restart your shell or run 'hash -r' to clear command cache."
         rm -f "${script_path}.backup"
+        
+        # Auto-reload if script was sourced
+        if _is_sourced; then
+            echo "[INFO] Script was sourced. Reloading automatically..."
+            if source "$script_path" 2>/dev/null; then
+                echo "[INFO] Script reloaded successfully!"
+            else
+                echo "[WARNING] Automatic reload failed. Please manually run: source $script_path" >&2
+            fi
+        else
+            echo "[INFO] Please restart your shell or run 'hash -r' to clear command cache."
+        fi
+        
         return 0
     else
         echo "[ERROR] Installation failed. Restoring backup..." >&2
@@ -394,7 +466,32 @@ dev() {
             fi
             ;;
         reload)
-            source ~/bin/dev.sh
+            # Use improved path detection
+            local script_path
+            if ! script_path=$(_get_script_path "dev"); then
+                echo "[ERROR] Could not determine script path for reload." >&2
+                echo "[INFO] Please specify manually or check your installation." >&2
+                return 1
+            fi
+            
+            # Resolve to absolute path
+            if [[ ! "$script_path" =~ ^/ ]]; then
+                local script_dir="$(dirname "$script_path")"
+                local abs_dir
+                if ! abs_dir="$(cd "$script_dir" 2>/dev/null && pwd)"; then
+                    echo "[ERROR] Failed to resolve absolute path for script directory: $script_dir" >&2
+                    return 1
+                fi
+                script_path="$abs_dir/$(basename "$script_path")"
+            fi
+            
+            if [[ -f "$script_path" ]]; then
+                source "$script_path"
+                echo "[INFO] Dev script reloaded from: $script_path"
+            else
+                echo "[ERROR] Could not find dev script at: $script_path" >&2
+                return 1
+            fi
             ;;
         upgrade)
             # Allow optional script path as argument
