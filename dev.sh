@@ -6,7 +6,7 @@
 #
 # Description: dDEV symfony dev shortening tools
 # Usage: dev [OPTIONS]
-# Version: 1.0.1
+# Version: 1.1.0
 # https://github.com/akaw/dev/
 
 # Hilfsfunktion: Liest die neueste Versionsnummer aus Git-Tags
@@ -519,7 +519,11 @@ if [[ -n $ZSH_VERSION ]]; then
             release:minor
             release:major
             reload
-            -h --help
+            upgrade
+            set:current
+            help
+            -h
+            --help
         )
         compadd -a cmds
     }
