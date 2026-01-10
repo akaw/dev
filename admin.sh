@@ -369,7 +369,13 @@ admin() {
             fi
             # Get absolute path if it's a relative path
             if [[ ! "$script_path" =~ ^/ ]]; then
-                script_path="$(cd "$(dirname "$script_path")" 2>/dev/null && pwd)/$(basename "$script_path")"
+                local script_dir="$(dirname "$script_path")"
+                local abs_dir
+                if ! abs_dir="$(cd "$script_dir" 2>/dev/null && pwd)"; then
+                    echo "[ERROR] Failed to resolve absolute path for script directory: $script_dir" >&2
+                    return 1
+                fi
+                script_path="$abs_dir/$(basename "$script_path")"
             fi
             if [[ -f "$script_path" ]]; then
                 source "$script_path"
