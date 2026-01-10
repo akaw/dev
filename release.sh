@@ -310,8 +310,9 @@ _create_release() {
     esac
     
     # Bestimme neue Versionsnummern für alle Skripte
-    declare -A new_versions
-    declare -A current_versions
+    # Verwende parallele Arrays statt associative arrays für Kompatibilität
+    local new_versions=()
+    local current_versions=()
     
     for script in "${scripts_to_update[@]}"; do
         local current_version=$(_get_current_version "$script")
@@ -320,7 +321,7 @@ _create_release() {
             return 1
         fi
         
-        current_versions["$script"]="$current_version"
+        current_versions+=("$current_version")
         local new_version=$(_increment_version "$current_version" "$release_type")
         
         if [[ -z "$new_version" ]]; then
@@ -328,7 +329,7 @@ _create_release() {
             return 1
         fi
         
-        new_versions["$script"]="$new_version"
+        new_versions+=("$new_version")
         
         echo -e "${BLUE}$script:${NC} ${current_version} -> ${GREEN}${new_version}${NC} (${release_type})"
     done
@@ -336,17 +337,10 @@ _create_release() {
     echo ""
     
     # Verwende die erste neue Version für Tag (oder beide wenn unterschiedlich)
-    local tag_version
-    if [[ ${#scripts_to_update[@]} -eq 1 ]]; then
-        tag_version="${new_versions[${scripts_to_update[0]}]}"
-    else
-        # Wenn beide Skripte, verwende die höhere Version oder beide
-        local versions=("${new_versions[@]}")
-        tag_version="${versions[0]}"
-    fi
+    local tag_version="${new_versions[0]}"
     
     # Generiere Changelog
-    local oldest_current_version="${current_versions[${scripts_to_update[0]}]}"
+    local oldest_current_version="${current_versions[0]}"
     local changelog=$(_generate_changelog "$oldest_current_version" "$tag_version" "$release_type")
     
     echo -e "${BLUE}Changelog:${NC}"
@@ -370,11 +364,13 @@ _create_release() {
     
     # Aktualisiere Versionsnummern
     echo -e "\n${BLUE}Updating version numbers...${NC}"
+    local idx=0
     for script in "${scripts_to_update[@]}"; do
-        if ! _update_script_version "$script" "${new_versions[$script]}"; then
+        if ! _update_script_version "$script" "${new_versions[$idx]}"; then
             echo -e "${RED}Error: Failed to update version in $script${NC}" >&2
             return 1
         fi
+        idx=$((idx + 1))
     done
     
     # Generiere SHA256-Hashes
@@ -449,8 +445,10 @@ ${changelog}"
     echo -e "${GREEN}Released version: v${tag_version}${NC}"
     echo ""
     echo "Updated scripts:"
+    local idx=0
     for script in "${scripts_to_update[@]}"; do
-        echo "  - $script: ${current_versions[$script]} -> ${new_versions[$script]}"
+        echo "  - $script: ${current_versions[$idx]} -> ${new_versions[$idx]}"
+        idx=$((idx + 1))
     done
     echo ""
     echo "Tag: v${tag_version}"
