@@ -24,6 +24,7 @@ NC='\033[0m' # No Color
 # Script files
 DEV_SCRIPT="dev.sh"
 DEV_HASH="dev.sh.sha256"
+README_FILE="README.md"
 
 # Hilfsfunktion: Liest aktuelle Versionsnummer aus Skript-Header
 _get_current_version() {
@@ -171,6 +172,50 @@ _generate_sha256_hash() {
     return 0
 }
 
+# Hilfsfunktion: Aktualisiert Version in README.md
+_update_readme_version() {
+    local new_version="$1"
+    local readme_file="$2"
+    
+    if ! _validate_version "$new_version"; then
+        return 1
+    fi
+    
+    if [[ ! -f "$readme_file" ]]; then
+        echo "Error: README file not found: $readme_file" >&2
+        return 1
+    fi
+    
+    # Backup erstellen
+    local backup_file="${readme_file}.backup"
+    cp "$readme_file" "$backup_file"
+    
+    # Aktualisiere Version im Header-Format: **Version:** X.Y.Z
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        if sed -i '' "s/^\*\*Version:\*\* [0-9]\+\.[0-9]\+\.[0-9]\+$/\*\*Version:\*\* ${new_version}/" "$readme_file" 2>/dev/null; then
+            rm -f "$backup_file"
+            echo "Updated version in $readme_file to $new_version"
+            return 0
+        else
+            echo "Error: Failed to update version in $readme_file" >&2
+            mv "$backup_file" "$readme_file"
+            return 1
+        fi
+    else
+        # Linux und andere Unix-Systeme
+        if sed -i "s/^\*\*Version:\*\* [0-9]\+\.[0-9]\+\.[0-9]\+$/\*\*Version:\*\* ${new_version}/" "$readme_file" 2>/dev/null; then
+            rm -f "$backup_file"
+            echo "Updated version in $readme_file to $new_version"
+            return 0
+        else
+            echo "Error: Failed to update version in $readme_file" >&2
+            mv "$backup_file" "$readme_file"
+            return 1
+        fi
+    fi
+}
+
 # Hilfsfunktion: Prüft Release-Voraussetzungen
 _check_release_prerequisites() {
     local errors=0
@@ -307,9 +352,10 @@ _create_release() {
     echo -e "${YELLOW}This will:${NC}"
     echo "  1. Update version numbers in script files"
     echo "  2. Generate SHA256 hash files"
-    echo "  3. Create git commit"
-    echo "  4. Create git tag v${new_version}"
-    echo "  5. Push to origin"
+    echo "  3. Update README.md with new version"
+    echo "  4. Create git commit"
+    echo "  5. Create git tag v${new_version}"
+    echo "  6. Push to origin"
     echo ""
     read -p "Continue? (y/N): " -n 1 -r
     echo ""
@@ -332,6 +378,13 @@ _create_release() {
         return 1
     fi
     
+    # Aktualisiere README.md
+    echo -e "\n${BLUE}Updating README.md...${NC}"
+    if ! _update_readme_version "$new_version" "$README_FILE"; then
+        echo -e "${RED}Error: Failed to update README.md${NC}" >&2
+        return 1
+    fi
+    
     # Git Commit
     echo -e "\n${BLUE}Creating git commit...${NC}"
     local commit_message="Release v${new_version}"
@@ -339,6 +392,7 @@ _create_release() {
     # Stage geänderte Dateien
     git add "$DEV_SCRIPT"
     git add "$DEV_HASH"
+    git add "$README_FILE"
     
     if ! git commit -m "$commit_message"; then
         echo -e "${RED}Error: Failed to create git commit${NC}" >&2

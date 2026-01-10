@@ -1,6 +1,8 @@
-# dDEV Symfony Dev Shortening Tools
+# ddev developer shortcuts
 
 Bash script that provides shortcuts for frequently used `ddev` and `symfony` commands.
+
+**Version:** 1.3.0
 
 This repository contains:
 
