@@ -595,7 +595,6 @@ if [[ -n $ZSH_VERSION ]]; then
             release:major
             reload
             upgrade
-            set:current
             help
             -h
             --help

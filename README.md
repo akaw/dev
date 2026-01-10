@@ -166,7 +166,6 @@ Alle Befehle laufen standardmäßig innerhalb der ddev-Umgebung über `ddev exec
 
 #### Other
 - `reload` - Reload dev environment
-- `set:current`, `se:cu`, `sc` - Set CURRENT_PATH path
 - `upgrade` - Upgrade script to latest version
 - `help`, `-h`, `--help` - Show help message
 
@@ -227,8 +226,8 @@ Befehle für Production-Server-Management mit Apache, Supervisor, Certbot und Sy
 
 ## Version
 
-- dev.sh: 1.0.0
-- admin.sh: 1.2.5
+- dev.sh: 1.2.6
+- admin.sh: 1.2.6
 
 ## Author
 
