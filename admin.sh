@@ -34,7 +34,7 @@
 # Example: admin supervisor:reload
 # Note: This script requires sudo privileges for supervisor commands.
 # Make sure to run it in an environment where you have the necessary permissions.
-# Version: 1.2.1
+# Version: 1.2.2
 
 # Pfad-Variable für das aktuelle Deployment hinzufügen
 if [[ -n "$CURRENT_PATH" ]]; then
