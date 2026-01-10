@@ -190,29 +190,50 @@ _update_readme_version() {
     local backup_file="${readme_file}.backup"
     cp "$readme_file" "$backup_file"
     
-    # Aktualisiere Version im Header-Format: **Version:** X.Y.Z
+    local update_success=0
+    
+    # Aktualisiere beide Versionsangaben in der README.md
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        if sed -i '' "s/^\*\*Version:\*\* [0-9]\+\.[0-9]\+\.[0-9]\+$/\*\*Version:\*\* ${new_version}/" "$readme_file" 2>/dev/null; then
-            rm -f "$backup_file"
-            echo "Updated version in $readme_file to $new_version"
-            return 0
-        else
-            echo "Error: Failed to update version in $readme_file" >&2
-            mv "$backup_file" "$readme_file"
-            return 1
+        # macOS - Extended Regular Expressions mit -E für bessere Kompatibilität
+        # 1. Aktualisiere Zeile 5: **Version:** X.Y.Z
+        sed -i '' -E "s/^\*\*Version:\*\* [0-9]+\.[0-9]+\.[0-9]+/\*\*Version:\*\* ${new_version}/" "$readme_file" 2>/dev/null
+        if grep -q "^\*\*Version:\*\* ${new_version}" "$readme_file" 2>/dev/null; then
+            update_success=$((update_success + 1))
+        fi
+        
+        # 2. Aktualisiere Zeile 105: Current Version: **X.Y.Z**
+        sed -i '' -E "s/Current Version: \*\*[0-9]+\.[0-9]+\.[0-9]+\*\*/Current Version: \*\*${new_version}\*\*/" "$readme_file" 2>/dev/null
+        if grep -q "Current Version: \*\*${new_version}\*\*" "$readme_file" 2>/dev/null; then
+            update_success=$((update_success + 1))
         fi
     else
-        # Linux und andere Unix-Systeme
-        if sed -i "s/^\*\*Version:\*\* [0-9]\+\.[0-9]\+\.[0-9]\+$/\*\*Version:\*\* ${new_version}/" "$readme_file" 2>/dev/null; then
-            rm -f "$backup_file"
-            echo "Updated version in $readme_file to $new_version"
-            return 0
-        else
-            echo "Error: Failed to update version in $readme_file" >&2
-            mv "$backup_file" "$readme_file"
-            return 1
+        # Linux und andere Unix-Systeme - Extended Regular Expressions mit -E
+        # 1. Aktualisiere Zeile 5: **Version:** X.Y.Z
+        sed -i -E "s/^\*\*Version:\*\* [0-9]+\.[0-9]+\.[0-9]+/\*\*Version:\*\* ${new_version}/" "$readme_file" 2>/dev/null
+        if grep -q "^\*\*Version:\*\* ${new_version}" "$readme_file" 2>/dev/null; then
+            update_success=$((update_success + 1))
         fi
+        
+        # 2. Aktualisiere Zeile 105: Current Version: **X.Y.Z**
+        sed -i -E "s/Current Version: \*\*[0-9]+\.[0-9]+\.[0-9]+\*\*/Current Version: \*\*${new_version}\*\*/" "$readme_file" 2>/dev/null
+        if grep -q "Current Version: \*\*${new_version}\*\*" "$readme_file" 2>/dev/null; then
+            update_success=$((update_success + 1))
+        fi
+    fi
+    
+    # Prüfe ob beide Updates erfolgreich waren
+    if [[ $update_success -eq 2 ]]; then
+        rm -f "$backup_file"
+        echo "Updated version in $readme_file to $new_version (both locations)"
+        return 0
+    elif [[ $update_success -eq 1 ]]; then
+        echo "Warning: Only one version entry was updated in $readme_file" >&2
+        rm -f "$backup_file"
+        return 0
+    else
+        echo "Error: Failed to update version in $readme_file" >&2
+        mv "$backup_file" "$readme_file"
+        return 1
     fi
 }
 
