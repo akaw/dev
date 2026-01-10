@@ -51,263 +51,132 @@ fi
 _upgrade() {
     local script_path="${1:-}"
     
-    # ===========================
-    # 1. Determine Script Path
-    # ===========================
-    # If path provided as argument, use it
-    if [[ -n "$script_path" && -f "$script_path" ]]; then
-        # Use provided path
-        :
-    else
-        # Determine script path - try multiple methods for compatibility
+    # Determine script path if not provided
+    if [[ -z "$script_path" || ! -f "$script_path" ]]; then
         script_path=""
         
-        # Method 1: Try BASH_SOURCE (works when script is executed directly)
-        if [[ -n "${BASH_SOURCE[0]}" && -f "${BASH_SOURCE[0]}" ]]; then
-            script_path="${BASH_SOURCE[0]}"
-        fi
+        # Try BASH_SOURCE first
+        [[ -n "${BASH_SOURCE[0]}" && -f "${BASH_SOURCE[0]}" ]] && script_path="${BASH_SOURCE[0]}"
         
-        # Method 2: Try to find script in common locations (when sourced)
-        if [[ -z "$script_path" || ! -f "$script_path" ]]; then
-            local possible_paths=(
-                ~/bin/admin.sh
-                "$HOME/bin/admin.sh"
-                /usr/local/bin/admin.sh
-                /opt/dev/admin.sh
-            )
-            
-            for path in "${possible_paths[@]}"; do
-                if [[ -f "$path" ]]; then
-                    # Verify it's the right script by checking for version header
-                    if grep -q "^# Version:" "$path" 2>/dev/null; then
-                        script_path="$path"
-                        break
-                    fi
+        # Try common locations
+        if [[ -z "$script_path" ]]; then
+            for path in ~/bin/admin.sh "$HOME/bin/admin.sh" /usr/local/bin/admin.sh /opt/dev/admin.sh; do
+                if [[ -f "$path" ]] && grep -q "^# Version:" "$path" 2>/dev/null; then
+                    script_path="$path"
+                    break
                 fi
             done
         fi
         
-        # Method 3: Try to find via which/command (if admin is in PATH)
-        if [[ -z "$script_path" || ! -f "$script_path" ]]; then
-            if command -v admin >/dev/null 2>&1; then
-                local which_path=$(which admin 2>/dev/null || command -v admin 2>/dev/null || echo "")
-                if [[ -n "$which_path" && -f "$which_path" ]]; then
-                    # Check if it's a script file (not a function alias)
-                    if [[ -f "$which_path" ]] && head -n 1 "$which_path" 2>/dev/null | grep -q "^#!"; then
-                        script_path="$which_path"
-                    fi
-                fi
-            fi
+        # Try which/command
+        if [[ -z "$script_path" ]] && command -v admin >/dev/null 2>&1; then
+            local which_path=$(which admin 2>/dev/null || command -v admin 2>/dev/null)
+            [[ -f "$which_path" ]] && head -n 1 "$which_path" 2>/dev/null | grep -q "^#!" && script_path="$which_path"
         fi
         
-        # Method 4: Try $0 as last resort (only if it's a file)
-        if [[ -z "$script_path" || ! -f "$script_path" ]]; then
-            if [[ -n "$0" && "$0" != "-"* && -f "$0" ]]; then
-                script_path="$0"
-            fi
-        fi
+        # Try $0 as fallback
+        [[ -z "$script_path" && -n "$0" && "$0" != "-"* && -f "$0" ]] && script_path="$0"
     fi
     
-    # Final check - if we still don't have a valid path, error out
+    # Validate script path
     if [[ -z "$script_path" || ! -f "$script_path" ]]; then
-        echo "[ERROR] Could not determine script path automatically." >&2
-        echo "[INFO] The script path is needed to create a backup." >&2
-        echo "[INFO] Common locations checked:" >&2
-        echo "[INFO]   - ~/bin/admin.sh" >&2
-        echo "[INFO]   - \$HOME/bin/admin.sh" >&2
-        echo "[INFO]   - /usr/local/bin/admin.sh" >&2
-        echo "[INFO]" >&2
-        echo "[INFO] Please specify the path manually:" >&2
-        echo "[INFO]   admin upgrade /path/to/admin.sh" >&2
+        echo "[ERROR] Could not determine script path. Please specify manually: admin upgrade /path/to/admin.sh" >&2
         return 1
     fi
     
     # Resolve to absolute path
-    if [[ "$script_path" != /* ]]; then
-        script_path=$(cd "$(dirname "$script_path")" && pwd)/$(basename "$script_path")
-    else
-        script_path=$(cd "$(dirname "$script_path")" && pwd)/$(basename "$script_path")
-    fi
+    script_path=$(cd "$(dirname "$script_path")" && pwd)/$(basename "$script_path")
     
-    # ===========================
-    # 2. Check for Updates
-    # ===========================
     echo "[INFO] Checking for updates..."
-
-    # Temporary files for downloads
     local temp_script="/tmp/admin_new_version"
     local temp_hash="/tmp/admin_new_version.sha256"
 
-    # Fetch latest version from GitHub
+    # Fetch and validate latest version
     local latest_version
     if ! latest_version=$(curl -s -m 5 "https://raw.githubusercontent.com/akaw/dev/main/admin.sh" | grep -m 1 "^# Version:" | awk '{print $NF}'); then
         echo "[ERROR] Could not check for updates. Please check your internet connection." >&2
-        echo "[INFO] Possible solutions:" >&2
-        echo "[INFO]   - Check your internet connection" >&2
-        echo "[INFO]   - Verify firewall settings" >&2
-        echo "[INFO]   - Try again later" >&2
         return 1
     fi
     
-    if [[ -z "$latest_version" ]]; then
-        echo "[ERROR] Could not determine latest version from server." >&2
+    [[ -z "$latest_version" || ! "$latest_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && {
+        echo "[ERROR] Invalid version format: $latest_version" >&2
         return 1
-    fi
-    
-    # ===========================
-    # 3. Validate Version Format
-    # ===========================
-    # Validate version format
-    if [[ ! "$latest_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "[ERROR] Invalid version format received from server: $latest_version" >&2
-        return 1
-    fi
+    }
 
-    # Determine current version from this script's header ("# Version: X.Y.Z")
-    local current_version
-    current_version=$(grep -m 1 "^# Version:" "$script_path" 2>/dev/null | awk '{print $NF}')
-    if [[ -z "$current_version" || ! "$current_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        # If we cannot determine current version, treat as not up-to-date (proceed with upgrade)
-        current_version="0.0.0"
-    fi
+    # Check current version
+    local current_version=$(grep -m 1 "^# Version:" "$script_path" 2>/dev/null | awk '{print $NF}')
+    [[ ! "$current_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && current_version="0.0.0"
 
-    # Check if update is needed
     if [[ "$latest_version" == "$current_version" ]]; then
         echo "[INFO] You already have the latest version ($current_version)."
         return 0
     fi
 
     echo "[INFO] New version found: $latest_version (current: $current_version)"
-    
-    # ===========================
-    # 4. Download Update Files
-    # ===========================
     echo "[INFO] Downloading update..."
 
-    # Download new version and hash file with better error handling
-    if ! curl -s -o "$temp_script" "https://raw.githubusercontent.com/akaw/dev/main/admin.sh"; then
-        echo "[ERROR] Download of new version failed" >&2
-        echo "[INFO] Please check your internet connection and try again" >&2
-        return 1
-    fi
-
-    if ! curl -s -o "$temp_hash" "https://raw.githubusercontent.com/akaw/dev/main/admin.sh.sha256"; then
-        echo "[ERROR] Download of hash file failed" >&2
+    # Download files
+    if ! curl -s -o "$temp_script" "https://raw.githubusercontent.com/akaw/dev/main/admin.sh" || [[ ! -s "$temp_script" ]]; then
+        echo "[ERROR] Download failed" >&2
         rm -f "$temp_script"
-        echo "[INFO] Please check your internet connection and try again" >&2
         return 1
     fi
-    
-    # Verify downloaded files are not empty
-    if [[ ! -s "$temp_script" ]]; then
-        echo "[ERROR] Downloaded script file is empty" >&2
-        rm -f "$temp_script" "$temp_hash"
-        return 1
-    fi
-    
-    if [[ ! -s "$temp_hash" ]]; then
-        echo "[ERROR] Downloaded hash file is empty" >&2
+
+    if ! curl -s -o "$temp_hash" "https://raw.githubusercontent.com/akaw/dev/main/admin.sh.sha256" || [[ ! -s "$temp_hash" ]]; then
+        echo "[ERROR] Hash download failed" >&2
         rm -f "$temp_script" "$temp_hash"
         return 1
     fi
 
-    # ===========================
-    # 5. Verify Hash
-    # ===========================
-    local expected_hash
-    expected_hash=$(cat "$temp_hash")
+    # Verify hash
+    local expected_hash=$(cat "$temp_hash")
+    [[ ! "$expected_hash" =~ ^[a-f0-9]{64}$ ]] && {
+        echo "[ERROR] Invalid hash format" >&2
+        rm -f "$temp_script" "$temp_hash"
+        return 1
+    }
+
     local actual_hash
-
-    # Validate expected hash format
-    if [[ ! "$expected_hash" =~ ^[a-f0-9]{64}$ ]]; then
-        echo "[ERROR] Invalid hash format received: $expected_hash" >&2
-        rm -f "$temp_script" "$temp_hash"
-        return 1
-    fi
-
     if command -v shasum >/dev/null 2>&1; then
-        # macOS typically uses shasum
-        if ! actual_hash=$(shasum -a 256 "$temp_script" 2>/dev/null | awk '{print $1}'); then
-            echo "[ERROR] Failed to calculate SHA256 hash using shasum" >&2
-            rm -f "$temp_script" "$temp_hash"
-            return 1
-        fi
+        actual_hash=$(shasum -a 256 "$temp_script" 2>/dev/null | awk '{print $1}')
     elif command -v sha256sum >/dev/null 2>&1; then
-        # Linux typically uses sha256sum
-        if ! actual_hash=$(sha256sum "$temp_script" 2>/dev/null | awk '{print $1}'); then
-            echo "[ERROR] Failed to calculate SHA256 hash using sha256sum" >&2
-            rm -f "$temp_script" "$temp_hash"
-            return 1
-        fi
+        actual_hash=$(sha256sum "$temp_script" 2>/dev/null | awk '{print $1}')
     else
-        echo "[ERROR] No SHA256 utility found (shasum or sha256sum required)" >&2
-        echo "[INFO] Please install a SHA256 utility and try again" >&2
+        echo "[ERROR] No SHA256 utility found" >&2
         rm -f "$temp_script" "$temp_hash"
         return 1
     fi
 
     if [[ "$actual_hash" != "$expected_hash" ]]; then
-        echo "[ERROR] Hash verification failed! The update might be compromised." >&2
+        echo "[ERROR] Hash verification failed!" >&2
         echo "[ERROR] Expected: $expected_hash" >&2
         echo "[ERROR] Actual: $actual_hash" >&2
-        echo "[INFO] This could indicate:" >&2
-        echo "[INFO]   - Network corruption during download" >&2
-        echo "[INFO]   - Compromised update server" >&2
-        echo "[INFO]   - Man-in-the-middle attack" >&2
         rm -f "$temp_script" "$temp_hash"
         return 1
     fi
 
-    # ===========================
-    # 6. Install Update
-    # ===========================
-    # Remove update marker to force version check on next run
+    # Install update
     rm -f "/tmp/admin_update_check_$(date +%Y%m%d)" 2>/dev/null
-
-    # Create backup with error handling
+    
     if ! cp "$script_path" "${script_path}.backup"; then
-        echo "[ERROR] Failed to create backup of current script" >&2
+        echo "[ERROR] Failed to create backup" >&2
         rm -f "$temp_script" "$temp_hash"
         return 1
     fi
 
-    # Install new version with atomic operation
-    if mv "$temp_script" "$script_path"; then
-        if ! chmod +x "$script_path"; then
-            echo "[ERROR] Failed to set executable permissions on updated script" >&2
-            # Restore backup
-            mv "${script_path}.backup" "$script_path"
-            rm -f "$temp_hash"
-            return 1
-        fi
-        
+    if mv "$temp_script" "$script_path" && chmod +x "$script_path"; then
         rm -f "$temp_hash"
-        echo "[INFO] Update successful!"
-        
-        # Get the new version directly from the updated script header
-        local new_version
-        new_version=$(grep -m 1 "^# Version:" "$script_path" 2>/dev/null | awk '{print $NF}')
-        if [[ -n "$new_version" && "$new_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "[INFO] New version: ${new_version}"
-        else
-            echo "[WARN] Could not determine new version from updated script" >&2
-        fi
-        
+        local new_version=$(grep -m 1 "^# Version:" "$script_path" 2>/dev/null | awk '{print $NF}')
+        echo "[INFO] Update successful! New version: ${new_version:-unknown}"
         echo "[INFO] Please restart your shell or run 'hash -r' to clear command cache."
+        rm -f "${script_path}.backup"
+        return 0
     else
-        echo "[ERROR] Failed to install updated script" >&2
-        echo "[INFO] Restoring backup..." >&2
-        if ! mv "${script_path}.backup" "$script_path"; then
-            echo "[ERROR] CRITICAL: Failed to restore backup! Script may be corrupted." >&2
-            echo "[INFO] Please manually restore from: ${script_path}.backup" >&2
-        fi
+        echo "[ERROR] Installation failed. Restoring backup..." >&2
+        mv "${script_path}.backup" "$script_path" 2>/dev/null
         rm -f "$temp_script" "$temp_hash"
         return 1
     fi
-
-    # Clean up backup file
-    rm -f "${script_path}.backup"
-    return 0
 }
 
 _set_current_path_interactive() {
