@@ -36,7 +36,7 @@
 # Make sure to run it in an environment where you have the necessary permissions.
 
 # Pfad-Variable für das aktuelle Deployment hinzufügen
-if [[ -z "$CURRENT_PATH" ]]; then
+if [[ -n "$CURRENT_PATH" ]]; then
     alias current="cd \"$CURRENT_PATH\""
 else
     # ask for current path
@@ -362,7 +362,22 @@ admin() {
             fi
             ;;
         reload)
-            source ~/bin/admin.sh
+            local script_path="${BASH_SOURCE[0]}"
+            # Fallback to $0 if BASH_SOURCE is not available (shouldn't happen in sourced scripts)
+            if [[ -z "$script_path" ]]; then
+                script_path="$0"
+            fi
+            # Get absolute path if it's a relative path
+            if [[ ! "$script_path" =~ ^/ ]]; then
+                script_path="$(cd "$(dirname "$script_path")" 2>/dev/null && pwd)/$(basename "$script_path")"
+            fi
+            if [[ -f "$script_path" ]]; then
+                source "$script_path"
+                echo "[INFO] Admin script reloaded from: $script_path"
+            else
+                echo "[ERROR] Could not find admin script at: $script_path" >&2
+                return 1
+            fi
             ;;
         upgrade)
             _upgrade
