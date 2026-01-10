@@ -120,12 +120,20 @@ _upgrade() {
 
     # Check current version against latest version first
     local latest_version
-    if ! latest_version=$(curl -s -m 5 "https://raw.githubusercontent.com/akaw/dev/main/dev.sh" | grep -m 1 "^# Version:" | awk '{print $NF}'); then
-        echo "[ERROR] Could not check for updates. Please check your internet connection." >&2
+    # Fetch raw remote file first so we can diagnose parsing failures
+    local raw_remote
+    raw_remote=$(curl -s -m 5 "https://raw.githubusercontent.com/akaw/dev/main/dev.sh" || true)
+    latest_version=$(printf "%s" "$raw_remote" | grep -m 1 "^# Version:" | awk '{print $NF}' || true)
+    if [[ -z "$raw_remote" ]]; then
+        echo "[ERROR] Could not fetch remote file. Please check your internet connection." >&2
         echo "[INFO] Possible solutions:" >&2
         echo "[INFO]   - Check your internet connection" >&2
         echo "[INFO]   - Verify firewall settings" >&2
         echo "[INFO]   - Try again later" >&2
+        return 1
+    fi
+    if [[ -z "$latest_version" ]]; then
+        echo "[ERROR] Could not determine latest version from server." >&2
         return 1
     fi
     
@@ -271,6 +279,19 @@ _upgrade() {
     return 0
 }
 
+# Hilfsfunktion: Ermittelt den korrekten Log-Dateipfad
+_get_log_file_path() {
+    local log_date="${1:-$(date +%Y-%m-%d)}"
+    local dated_log="/var/www/html/var/log/dev-${log_date}.log"
+    local default_log="/var/www/html/var/log/dev.log"
+    
+    if command ddev exec test -f "$dated_log" 2>/dev/null; then
+        echo "$dated_log"
+    else
+        echo "$default_log"
+    fi
+}
+
 dev() {
     case "$1" in
         s)
@@ -339,20 +360,13 @@ dev() {
             command ddev exec bin/console messenger:stats 
             ;;
         logs:show|lo:sh|losh|ls|show:logs|sh:lo|shlo|l|logs)
-            local log_date="${2:-$(date +%Y-%m-%d)}"
-            if command ddev exec test -f "/var/www/html/var/log/dev-${log_date}.log"; then
-                command ddev exec tail "/var/www/html/var/log/dev-${log_date}.log"
-            else
-                command ddev exec tail "/var/www/html/var/log/dev.log"
-            fi
+            command ddev exec tail -n 100 "$(_get_log_file_path "$2")"
             ;;
         logs:tail|lo:ta|lota|lt|tail:logs|ta:lo|talo|tl)
-            local log_date="${2:-$(date +%Y-%m-%d)}"
-            if command ddev exec test -f "/var/www/html/var/log/dev-${log_date}.log"; then
-                command ddev exec tail -f "/var/www/html/var/log/dev-${log_date}.log"
-            else
-                command ddev exec tail -f "/var/www/html/var/log/dev.log"
-            fi
+            command ddev exec tail -n 100 -f "$(_get_log_file_path "$2")"
+            ;;
+        logs:cat|lo:ca|loca|lc|cat:logs|ca:lo|calo|cl)
+            command ddev exec cat "$(_get_log_file_path "$2")"
             ;;
         doctrine:migrations:migrate|do:mi:mi|domimi|dmm|migrate|mig|mm)
             command ddev exec bin/console doctrine:migrations:migrate --no-interaction
