@@ -242,6 +242,64 @@ Befehle für Production-Server-Management mit Apache, Supervisor, Certbot und Sy
 
 **Hinweis:** Viele Befehle benötigen `sudo`-Rechte. Stellen Sie sicher, dass Sie die entsprechenden Berechtigungen haben.
 
+### Sudo-Befehle für admin.sh
+
+Alle `admin.sh`-Befehle, die `sudo`-Rechte benötigen, und die von ihnen ausgeführten sudo-Befehle:
+
+#### Supervisor-Befehle
+
+- **`supervisor:reload`**, `su:rd`
+  - `sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorctl restart all && sudo supervisorctl status`
+
+- **`supervisor:stop`**, `su:sp`
+  - `sudo supervisorctl stop all && sudo supervisorctl status`
+
+- **`supervisor:start`**, `su:st`
+  - `sudo supervisorctl start all && sudo supervisorctl status`
+
+- **`supervisor:status`**, `su:ss`
+  - `sudo supervisorctl status`
+
+#### Apache-Befehle
+
+- **`apache:restart`**, `ap:rs`
+  - `sudo systemctl restart apache2`
+
+- **`apache:status`**, `ap:st`
+  - `sudo systemctl status apache2`
+
+- **`apache:start`**, `ap:sp`
+  - `sudo systemctl start apache2`
+
+- **`apache:stop`**, `ap:ss`
+  - `sudo systemctl stop apache2`
+
+- **`apache:reload`**, `ap:rl`
+  - `sudo systemctl reload apache2`
+
+- **`apache:test`**, `ap:te`
+  - `sudo apache2ctl configtest`
+
+#### Certbot/SSL-Befehle
+
+- **`cert:renew`**, `cb:rw`
+  - `sudo certbot renew --quiet --deploy-hook "sudo systemctl reload apache2"`
+
+- **`cert:status`**, `cb:st`
+  - `sudo certbot certificates`
+
+- **`cert:install`**, `cb:in`
+  - `sudo certbot --apache -d $domains --email $email --agree-tos --no-eff-email`
+
+- **`cert:delete`**, `cb:dl`
+  - `sudo certbot delete --cert-name $domain`
+
+- **`cert:renewal-info`**, `cb:ri`
+  - `sudo cat /etc/letsencrypt/renewal/*.conf`
+
+- **`cert:refresh`**, `cb:rf`
+  - `sudo certbot --manual --preferred-challenges dns --server https://acme-v02.api.letsencrypt.org/directory --email admin@calpager.com --domains *.calpager.com --agree-tos certonly`
+
 **Hinweis zu `set:current`:** Dieser Befehl setzt `CURRENT_PATH` nur **temporär** für die aktuelle Shell-Session. Nach dem Schließen der Shell ist der Wert weg. Für eine dauerhafte Konfiguration muss `CURRENT_PATH` manuell in `.bashrc` gesetzt werden (siehe Installation oben).
 
 **Alias:** Das Skript erstellt automatisch ein `current`-Alias, das zu `CURRENT_PATH` navigiert, wenn die Variable gesetzt ist.
