@@ -49,7 +49,83 @@ fi
 
 # Function to upgrade the script
 _upgrade() {
-    local script_path="${BASH_SOURCE[0]}"
+    local script_path="${1:-}"
+    
+    # If path provided as argument, use it
+    if [[ -n "$script_path" && -f "$script_path" ]]; then
+        # Use provided path
+        :
+    else
+        # Determine script path - try multiple methods for compatibility
+        script_path=""
+        
+        # Method 1: Try BASH_SOURCE (works when script is executed directly)
+        if [[ -n "${BASH_SOURCE[0]}" && -f "${BASH_SOURCE[0]}" ]]; then
+            script_path="${BASH_SOURCE[0]}"
+        fi
+        
+        # Method 2: Try to find script in common locations (when sourced)
+        if [[ -z "$script_path" || ! -f "$script_path" ]]; then
+            local possible_paths=(
+                ~/bin/admin.sh
+                "$HOME/bin/admin.sh"
+                /usr/local/bin/admin.sh
+                /opt/dev/admin.sh
+            )
+            
+            for path in "${possible_paths[@]}"; do
+                if [[ -f "$path" ]]; then
+                    # Verify it's the right script by checking for version header
+                    if grep -q "^# Version:" "$path" 2>/dev/null; then
+                        script_path="$path"
+                        break
+                    fi
+                fi
+            done
+        fi
+        
+        # Method 3: Try to find via which/command (if admin is in PATH)
+        if [[ -z "$script_path" || ! -f "$script_path" ]]; then
+            if command -v admin >/dev/null 2>&1; then
+                local which_path=$(which admin 2>/dev/null || command -v admin 2>/dev/null || echo "")
+                if [[ -n "$which_path" && -f "$which_path" ]]; then
+                    # Check if it's a script file (not a function alias)
+                    if [[ -f "$which_path" ]] && head -n 1 "$which_path" 2>/dev/null | grep -q "^#!"; then
+                        script_path="$which_path"
+                    fi
+                fi
+            fi
+        fi
+        
+        # Method 4: Try $0 as last resort (only if it's a file)
+        if [[ -z "$script_path" || ! -f "$script_path" ]]; then
+            if [[ -n "$0" && "$0" != "-"* && -f "$0" ]]; then
+                script_path="$0"
+            fi
+        fi
+    fi
+    
+    # Final check - if we still don't have a valid path, error out
+    if [[ -z "$script_path" || ! -f "$script_path" ]]; then
+        echo "[ERROR] Could not determine script path automatically." >&2
+        echo "[INFO] The script path is needed to create a backup." >&2
+        echo "[INFO] Common locations checked:" >&2
+        echo "[INFO]   - ~/bin/admin.sh" >&2
+        echo "[INFO]   - \$HOME/bin/admin.sh" >&2
+        echo "[INFO]   - /usr/local/bin/admin.sh" >&2
+        echo "[INFO]" >&2
+        echo "[INFO] Please specify the path manually:" >&2
+        echo "[INFO]   admin upgrade /path/to/admin.sh" >&2
+        return 1
+    fi
+    
+    # Resolve to absolute path
+    if [[ "$script_path" != /* ]]; then
+        script_path=$(cd "$(dirname "$script_path")" && pwd)/$(basename "$script_path")
+    else
+        script_path=$(cd "$(dirname "$script_path")" && pwd)/$(basename "$script_path")
+    fi
+    
     echo "[INFO] Checking for updates..."
 
     # Temporary files for downloads
@@ -387,7 +463,8 @@ admin() {
             fi
             ;;
         upgrade)
-            _upgrade
+            # Allow optional script path as argument
+            _upgrade "${2:-}"
             ;;
         set:current|set-current|se:cu|setcurrent|sc)
             _set_current_path_interactive "$@"
