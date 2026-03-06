@@ -1,0 +1,17 @@
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs & temp
+*.log
+tmp/
+temp/
+*.pid
