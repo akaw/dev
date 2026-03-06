@@ -347,10 +347,45 @@ dev() {
             command ddev ssh
             ;;
         u|up)
-            command open -g -a OrbStack && sleep 5 && command ddev start && command ddev status && command ddev sequelace && command ddev mailpit && command ddev launch && command cursor .
+            echo "Starting OrbStack, ddev, Sequel Ace, Mailpit, Website and Cursor..."
+            command open -g -a OrbStack 
+            echo "Waiting 10 seconds..."
+            sleep 10
+            //test is orbstack is running
+            if ! command orbstack status > /dev/null 2>&1; then
+                echo "OrbStack is not running. Starting OrbStack..."
+                if ! command orbstack status > /dev/null 2>&1; then
+                    echo "OrbStack is still not running. Starting OrbStack..."
+                    command open -g -a OrbStack
+                    sleep 10
+                    if ! command orbstack status > /dev/null 2>&1; then
+                        echo "OrbStack is still not running. Please start OrbStack and try again."
+                        return 1
+                    fi
+                    return 1
+                fi
+            fi
+            echo "Starting ddev..."
+            command ddev start
+            echo "Starting ddev status..."
+            command ddev status
+            echo "Starting ddev sequelace..."
+            command ddev sequelace
+            echo "Starting ddev mailpit..."
+            command ddev mailpit
+            echo "Starting ddev launch..."
+            command ddev launch
+            echo "Starting cursor..."
+            command cursor .
+            echo "Done!"    
             ;;
         d|down)
-            command ddev stop && command close -a OrbStack
+            echo "Stopping ddev..."
+            command ddev stop
+            echo "Waiting 5 seconds..."
+            sleep 10
+            echo "Closing OrbStack..."
+            command close -a OrbStack
             ;;
         e)
             shift
