@@ -540,6 +540,9 @@ dev() {
             # Allow optional script path as argument
             _upgrade "${2:-}"
             ;;
+        version|-V|--version)
+            echo "dev $( grep -m 1 "^# Version:" "$( _get_script_path "dev" 2>/dev/null || echo "${BASH_SOURCE[0]:-$0}" )" 2>/dev/null | awk '{print $NF}' )"
+            ;;
         help|-h|--help)
             echo "Usage: dev [command]"
             echo "Default command: ddev exec [command]."
@@ -591,6 +594,7 @@ dev() {
             echo "Other:"
             echo "  upgrade                                - Upgrade dev script to latest version"
             echo "  reload                                 - Reload dev environment"
+            echo "  version, -V, --version                 - Show dev script version"
             echo "  help, -h, --help                       - Show this help"
             ;;
         *)
@@ -638,6 +642,9 @@ if [[ -n $ZSH_VERSION ]]; then
             release:major
             reload
             upgrade
+            version
+            -V
+            --version
             help
             -h
             --help
