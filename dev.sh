@@ -88,8 +88,8 @@ _create_release_tag() {
     
     # Run tests before creating release tag
     if [[ -f ./scripts/run-tests.sh ]]; then
-        if ! bash ./scripts/run-tests.sh; then
-            echo "Error: Test script './scripts/run-tests.sh' failed – aborting release" >&2
+        if ! ddev exec bash scripts/run-tests.sh; then
+            echo "Error: Test script 'scripts/run-tests.sh' failed – aborting release" >&2
             return 1
         fi
     fi
