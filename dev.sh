@@ -315,16 +315,11 @@ _upgrade() {
         echo "[INFO] Update successful! New version: ${new_version:-unknown}"
         rm -f "${script_path}.backup"
         
-        # Auto-reload if script was sourced
-        if _is_sourced; then
-            echo "[INFO] Script was sourced. Reloading automatically..."
-            if source "$script_path" 2>/dev/null; then
-                echo "[INFO] Script reloaded successfully!"
-            else
-                echo "[WARNING] Automatic reload failed. Please manually run: source $script_path" >&2
-            fi
+        # Reload the script to apply the update in the current shell session
+        if source "$script_path" 2>/dev/null; then
+            echo "[INFO] Script reloaded successfully!"
         else
-            echo "[INFO] Please restart your shell or run 'hash -r' to clear command cache."
+            echo "[WARNING] Automatic reload failed. Please manually run: source $script_path" >&2
         fi
         
         return 0
@@ -540,7 +535,7 @@ dev() {
             # Allow optional script path as argument
             _upgrade "${2:-}"
             ;;
-        version|-V|--version)
+        version|-v|-V|--version)
             echo "dev $( grep -m 1 "^# Version:" "$( _get_script_path "dev" 2>/dev/null || echo "${BASH_SOURCE[0]:-$0}" )" 2>/dev/null | awk '{print $NF}' )"
             ;;
         help|-h|--help)
