@@ -9,14 +9,14 @@
 # Version: 1.3.4
 # https://github.com/akaw/dev/
 
-# Hilfsfunktion: Liest die neueste Versionsnummer aus Git-Tags
+# Helper function: Reads the latest version number from Git tags
 _get_latest_version() {
     if ! git rev-parse --git-dir > /dev/null 2>&1; then
         echo "0.0.0"
         return 1
     fi
     
-    # Finde alle Tags die dem Format vX.Y.Z entsprechen und sortiere sie
+    # Find all tags matching the format vX.Y.Z and sort them
     local latest_tag=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
     
     if [[ -z "$latest_tag" ]]; then
@@ -24,10 +24,10 @@ _get_latest_version() {
         return 0
     fi
     
-    # Entferne das 'v' Präfix
+    # Remove the 'v' prefix
     local version="${latest_tag#v}"
     
-    # Validiere dass das Ergebnis korrekt ist
+    # Validate that the result is correct
     if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         echo "$version"
     else
@@ -35,7 +35,7 @@ _get_latest_version() {
     fi
 }
 
-# Hilfsfunktion: Validiert Versionsnummer-Format
+# Helper function: Validates version number format
 _validate_version() {
     local version="$1"
     if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -45,7 +45,7 @@ _validate_version() {
     return 0
 }
 
-# Hilfsfunktion: Inkrementiert Versionsnummer basierend auf Release-Typ
+# Helper function: Increments version number based on release type
 _increment_version() {
     local version="$1"
     local release_type="$2"
@@ -74,31 +74,39 @@ _increment_version() {
     echo "$major.$minor.$patch"
 }
 
-# Hilfsfunktion: Erstellt Release-Tag und pusht ihn
+# Helper function: Creates release tag and pushes it
 _create_release_tag() {
     local version="$1"
     local release_type="$2"
     
-    # Validiere Versionsnummer
+    # Validate version number
     if ! _validate_version "$version"; then
         return 1
     fi
     
     local tag_name="v$version"
     
-    # Prüfe ob Tag bereits existiert
+    # Run tests before creating release tag
+    if [[ -f ./scripts/run-tests.sh ]]; then
+        if ! bash ./scripts/run-tests.sh; then
+            echo "Error: Test script './scripts/run-tests.sh' failed – aborting release" >&2
+            return 1
+        fi
+    fi
+    
+    # Check if tag already exists
     if git rev-parse "$tag_name" > /dev/null 2>&1; then
         echo "Error: Tag $tag_name already exists" >&2
         return 1
     fi
     
-    # Erstelle annotierten Tag
+    # Create annotated tag
     if ! git tag -a "$tag_name" -m "Release version $version ($release_type)"; then
         echo "Error: Failed to create tag $tag_name" >&2
         return 1
     fi
     
-    # Push Tag zu origin
+    # Push tag to origin
     if ! git push origin "$tag_name"; then
         echo "Error: Failed to push tag $tag_name to origin" >&2
         echo "Tag was created locally but push failed. You can try: git push origin $tag_name" >&2
@@ -328,7 +336,7 @@ _upgrade() {
     fi
 }
 
-# Hilfsfunktion: Ermittelt den korrekten Log-Dateipfad
+# Helper function: Determines the correct log file path
 _get_log_file_path() {
     local log_date="${1:-$(date +%Y-%m-%d)}"
     local dated_log="/var/www/html/var/log/dev-${log_date}.log"
@@ -466,37 +474,37 @@ dev() {
             ;;
         release:patch|re:pa|repa)
             if [[ -z "$2" ]]; then
-                # Automatische Versionsnummern-Verwaltung
+                # Automatic version number management
                 local current_version=$(_get_latest_version)
                 local new_version=$(_increment_version "$current_version" "patch")
                 echo "Creating patch release: $current_version -> $new_version"
                 _create_release_tag "$new_version" "patch"
             else
-                # Manuelle Versionsnummer
+                # Manual version number
                 _create_release_tag "$2" "patch"
             fi
             ;;
         release:minor|re:mi|remi)
             if [[ -z "$2" ]]; then
-                # Automatische Versionsnummern-Verwaltung
+                # Automatic version number management
                 local current_version=$(_get_latest_version)
                 local new_version=$(_increment_version "$current_version" "minor")
                 echo "Creating minor release: $current_version -> $new_version"
                 _create_release_tag "$new_version" "minor"
             else
-                # Manuelle Versionsnummer
+                # Manual version number
                 _create_release_tag "$2" "minor"
             fi
             ;;
         release:major|re:ma|rema)
             if [[ -z "$2" ]]; then
-                # Automatische Versionsnummern-Verwaltung
+                # Automatic version number management
                 local current_version=$(_get_latest_version)
                 local new_version=$(_increment_version "$current_version" "major")
                 echo "Creating major release: $current_version -> $new_version"
                 _create_release_tag "$new_version" "major"
             else
-                # Manuelle Versionsnummer
+                # Manual version number
                 _create_release_tag "$2" "major"
             fi
             ;;
