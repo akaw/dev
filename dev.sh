@@ -350,25 +350,7 @@ dev() {
             command ddev ssh
             ;;
         u|up)
-            echo "Starting OrbStack, ddev, Sequel Ace, Mailpit, Website and Cursor..."
-            command open -g -a OrbStack 
-            echo "Waiting 10 seconds..."
-            sleep 10
-            //test is orbstack is running
-            if ! command orbstack status > /dev/null 2>&1; then
-                echo "OrbStack is not running. Starting OrbStack..."
-                if ! command orbstack status > /dev/null 2>&1; then
-                    echo "OrbStack is still not running. Starting OrbStack..."
-                    command open -g -a OrbStack
-                    sleep 10
-                    if ! command orbstack status > /dev/null 2>&1; then
-                        echo "OrbStack is still not running. Please start OrbStack and try again."
-                        return 1
-                    fi
-                    return 1
-                fi
-            fi
-            echo "Starting ddev..."
+            echo "Starting ddev, Sequel Ace, Mailpit, Website and Cursor..."
             command ddev start
             echo "Starting ddev status..."
             command ddev status
@@ -385,10 +367,6 @@ dev() {
         d|down)
             echo "Stopping ddev..."
             command ddev stop
-            echo "Waiting 5 seconds..."
-            sleep 10
-            echo "Closing OrbStack..."
-            command close -a OrbStack
             ;;
         e)
             shift
@@ -549,8 +527,8 @@ dev() {
             echo "  cr, ca:rm, cache:remove, carm          - Remove cache directory"
             echo ""
             echo "Development:"
-            echo "  u, up                                  - Start OrbStack, ddev, Sequel Ace, Mailpit, Website and Cursor"
-            echo "  d, down                                - Stop ddev and OrbStack"
+            echo "  u, up                                  - Start ddev, Sequel Ace, Mailpit, Website and Cursor"
+            echo "  d, down                                - Stop ddev"
             echo "  r, restart                             - Restart ddev"
             echo "  s                                      - SSH into container"
             echo "  status, stat, st                       - Show status"
