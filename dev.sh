@@ -361,7 +361,7 @@ dev() {
             echo "Starting ddev launch..."
             command ddev launch
             echo "Starting cursor..."
-            command cursor .
+            command code .
             echo "Done!"    
             ;;
         d|down)
