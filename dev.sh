@@ -350,9 +350,12 @@ dev() {
             command ddev ssh
             ;;
         u|up)
+            if [[ ! -d .ddev ]]; then
+                echo "Error: No .ddev folder found in current directory. Please navigate to a ddev project or initialize one with 'ddev config'." >&2
+                return 1
+            fi
             echo "Starting ddev, Sequel Ace, Mailpit, Website and Cursor..."
             command ddev start
-            echo "Starting ddev status..."
             command ddev status
             echo "Starting ddev sequelace..."
             command ddev sequelace
@@ -360,7 +363,7 @@ dev() {
             command ddev mailpit
             echo "Starting ddev launch..."
             command ddev launch
-            echo "Starting cursor..."
+            echo "Starting ide..."
             command code .
             echo "Done!"    
             ;;
