@@ -12,6 +12,17 @@
 # Editor used by 'dev up' (override via IDE env var)
 IDE="${IDE:-code}"
 
+# Remember the script path while it is being sourced; inside functions
+# neither BASH_SOURCE nor zsh's %x reliably point to this file anymore
+if [[ -n "${ZSH_VERSION}" ]]; then
+    _DEV_SCRIPT_PATH="${(%):-%x}"
+else
+    _DEV_SCRIPT_PATH="${BASH_SOURCE[0]}"
+fi
+if [[ -f "$_DEV_SCRIPT_PATH" ]]; then
+    _DEV_SCRIPT_PATH="$(cd "$(dirname "$_DEV_SCRIPT_PATH")" && pwd)/$(basename "$_DEV_SCRIPT_PATH")"
+fi
+
 # Helper function: Reads the latest version number from Git tags
 _get_latest_version() {
     if ! git rev-parse --git-dir > /dev/null 2>&1; then
@@ -125,37 +136,12 @@ _get_script_path() {
     local script_name="${1:-dev}"
     local script_path=""
     
-    # 1. Bash: Try all BASH_SOURCE indices
-    if [[ -n "${BASH_VERSION}" ]]; then
-        local idx=0
-        while [[ ${idx} -lt 10 ]]; do
-            local candidate="${BASH_SOURCE[$idx]}"
-            if [[ -n "$candidate" && -f "$candidate" ]]; then
-                # Verify it's actually our script by checking for Version marker
-                if grep -q "^# Version:" "$candidate" 2>/dev/null; then
-                    script_path="$candidate"
-                    break
-                fi
-            fi
-            ((idx++))
-        done
+    # 1. Path remembered while the script was sourced
+    if [[ -f "$_DEV_SCRIPT_PATH" ]] && grep -q "^# Version:" "$_DEV_SCRIPT_PATH" 2>/dev/null; then
+        script_path="$_DEV_SCRIPT_PATH"
     fi
     
-    # 2. Zsh: Use special parameter expansion
-    if [[ -z "$script_path" && -n "${ZSH_VERSION}" ]]; then
-        # In zsh, ${(%):-%x} gives the source file
-        local candidate="${(%):-%x}"
-        if [[ -f "$candidate" ]] && grep -q "^# Version:" "$candidate" 2>/dev/null; then
-            script_path="$candidate"
-        fi
-        
-        # Alternative: Try $0 in zsh
-        if [[ -z "$script_path" && -f "$0" ]] && grep -q "^# Version:" "$0" 2>/dev/null; then
-            script_path="$0"
-        fi
-    fi
-    
-    # 3. Try command -v to find script in PATH
+    # 2. Try command -v to find script in PATH
     if [[ -z "$script_path" ]] && command -v "$script_name" >/dev/null 2>&1; then
         local which_path=$(command -v "$script_name" 2>/dev/null)
         if [[ -n "$which_path" && -f "$which_path" ]]; then
@@ -168,9 +154,10 @@ _get_script_path() {
         fi
     fi
     
-    # 4. Try common installation locations
+    # 3. Try common installation locations
     if [[ -z "$script_path" ]]; then
         # Note: don't name the loop variable 'path' - in zsh it is tied to $PATH
+        local candidate_path
         for candidate_path in ~/bin/${script_name}.sh "$HOME/bin/${script_name}.sh" /usr/local/bin/${script_name}.sh /opt/dev/${script_name}.sh; do
             if [[ -f "$candidate_path" ]] && grep -q "^# Version:" "$candidate_path" 2>/dev/null; then
                 script_path="$candidate_path"
@@ -179,7 +166,7 @@ _get_script_path() {
         done
     fi
     
-    # 5. Last fallback: Try $0 (works when script is executed directly)
+    # 4. Last fallback: Try $0 (works when script is executed directly)
     if [[ -z "$script_path" && -n "$0" && "$0" != "-"* ]]; then
         if [[ -f "$0" ]] && grep -q "^# Version:" "$0" 2>/dev/null; then
             script_path="$0"
@@ -195,22 +182,6 @@ _get_script_path() {
     return 1
 }
 
-# Helper function to check if script was sourced
-_is_sourced() {
-    # Bash: Compare BASH_SOURCE and $0
-    if [[ -n "${BASH_VERSION}" ]]; then
-        [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 0
-    fi
-    
-    # Zsh: Check if script was sourced
-    if [[ -n "${ZSH_VERSION}" ]]; then
-        # In zsh, when sourced, $0 is usually the shell name or differs from script
-        [[ "${ZSH_EVAL_CONTEXT}" =~ :file$ ]] && return 0
-    fi
-    
-    return 1
-}
-
 # Function to upgrade the script
 _upgrade() {
     local script_path="${1:-}"
@@ -219,7 +190,7 @@ _upgrade() {
     if [[ -z "$script_path" || ! -f "$script_path" ]]; then
         if ! script_path=$(_get_script_path "dev"); then
             echo "[ERROR] Could not determine script path automatically." >&2
-            echo "[INFO] Tried: BASH_SOURCE (bash), %x expansion (zsh), command -v, common paths, \$0" >&2
+            echo "[INFO] Tried: path at source time, command -v, common paths, \$0" >&2
             echo "[INFO] Please specify manually: dev upgrade /path/to/dev.sh" >&2
             return 1
         fi
@@ -228,7 +199,7 @@ _upgrade() {
     # Validate script path
     if [[ -z "$script_path" || ! -f "$script_path" ]]; then
         echo "[ERROR] Could not determine script path automatically." >&2
-        echo "[INFO] Tried: BASH_SOURCE (bash), %x expansion (zsh), command -v, common paths, \$0" >&2
+        echo "[INFO] Tried: path at source time, command -v, common paths, \$0" >&2
         echo "[INFO] Please specify manually: dev upgrade /path/to/dev.sh" >&2
         return 1
     fi
@@ -237,18 +208,25 @@ _upgrade() {
     script_path=$(cd "$(dirname "$script_path")" && pwd)/$(basename "$script_path")
     
     echo "[INFO] Checking for updates..."
-    local temp_script="/tmp/dev_new_version"
-    local temp_hash="/tmp/dev_new_version.sha256"
+    local temp_script temp_hash
+    if ! temp_script=$(mktemp "${TMPDIR:-/tmp}/dev_new_version.XXXXXX") \
+        || ! temp_hash=$(mktemp "${TMPDIR:-/tmp}/dev_new_version_sha256.XXXXXX"); then
+        echo "[ERROR] Could not create temporary files" >&2
+        rm -f "$temp_script"
+        return 1
+    fi
 
     # Fetch and validate latest version
     local latest_version
-    if ! latest_version=$(curl -s -m 5 "https://raw.githubusercontent.com/akaw/dev/main/dev.sh" | grep -m 1 "^# Version:" | awk '{print $NF}'); then
+    if ! latest_version=$(curl -fs -m 5 "https://raw.githubusercontent.com/akaw/dev/main/dev.sh" | grep -m 1 "^# Version:" | awk '{print $NF}'); then
         echo "[ERROR] Could not check for updates. Please check your internet connection." >&2
+        rm -f "$temp_script" "$temp_hash"
         return 1
     fi
     
     [[ -z "$latest_version" || ! "$latest_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && {
         echo "[ERROR] Invalid version format: $latest_version" >&2
+        rm -f "$temp_script" "$temp_hash"
         return 1
     }
 
@@ -258,6 +236,7 @@ _upgrade() {
 
     if [[ "$latest_version" == "$current_version" ]]; then
         echo "[INFO] You already have the latest version ($current_version)."
+        rm -f "$temp_script" "$temp_hash"
         return 0
     fi
 
@@ -265,13 +244,13 @@ _upgrade() {
     echo "[INFO] Downloading update..."
 
     # Download files
-    if ! curl -s -o "$temp_script" "https://raw.githubusercontent.com/akaw/dev/main/dev.sh" || [[ ! -s "$temp_script" ]]; then
+    if ! curl -fs -o "$temp_script" "https://raw.githubusercontent.com/akaw/dev/main/dev.sh" || [[ ! -s "$temp_script" ]]; then
         echo "[ERROR] Download failed" >&2
-        rm -f "$temp_script"
+        rm -f "$temp_script" "$temp_hash"
         return 1
     fi
 
-    if ! curl -s -o "$temp_hash" "https://raw.githubusercontent.com/akaw/dev/main/dev.sh.sha256" || [[ ! -s "$temp_hash" ]]; then
+    if ! curl -fs -o "$temp_hash" "https://raw.githubusercontent.com/akaw/dev/main/dev.sh.sha256" || [[ ! -s "$temp_hash" ]]; then
         echo "[ERROR] Hash download failed" >&2
         rm -f "$temp_script" "$temp_hash"
         return 1
@@ -313,7 +292,7 @@ _upgrade() {
         return 1
     fi
 
-    if mv "$temp_script" "$script_path" && chmod +x "$script_path"; then
+    if mv "$temp_script" "$script_path" && chmod a+rx "$script_path"; then
         rm -f "$temp_hash"
         local new_version=$(grep -m 1 "^# Version:" "$script_path" 2>/dev/null | awk '{print $NF}')
         echo "[INFO] Update successful! New version: ${new_version:-unknown}"
@@ -364,25 +343,25 @@ dev() {
             echo "Starting ddev launch..."
             command ddev launch
             echo "Starting ide..."
-            command $IDE .
+            command "$IDE" .
             echo "Done!"    
             ;;
         d|down)
             echo "Stopping ddev..."
             command ddev stop
             ;;
-        e)
+        e|exec)
             shift
             command ddev exec "$@"
             ;;
-        c)
+        c|console)
             shift
             command ddev console "$@"
             ;;
-        r)
+        r|restart)
             command ddev restart
             ;;
-        stat|st)
+        status|stat|st)
             command ddev status
             ;;
         open:sequelace|op:se|opse|os|se|seq)
@@ -391,8 +370,8 @@ dev() {
         open:website|op:we|opwe|ow|website|site|web)
             command ddev launch
             ;;
-        open:mailhog|op:ma|opma|om|mail)
-            command ddev mailhog
+        open:mailpit|open:mailhog|mailpit|mailhog|op:ma|opma|om|mail)
+            command ddev mailpit
             ;;
         cache:clear|ca:cl|cacl|cc)
             command ddev exec bin/console cache:clear
@@ -546,8 +525,8 @@ dev() {
             echo "  sql, query, dbquery, dqs, do:qu:sq     - Execute SQL query"
             echo ""
             echo "Messenger:"
-            echo "  mc, me:co, messenger:consume           - Consume all queues"
-            echo "  mcfa, me:co:fa, messenger:failed       - Consume failed queue"
+            echo "  mc, me:co, messenger:consume           - Run messenger:consume"
+            echo "  mf, me:fa, messenger:failed            - Consume failed queue"
             echo "  mh, me:hi, messenger:high              - Consume high priority queue"
             echo "  mn, me:no, messenger:normal            - Consume normal priority queue"
             echo "  md, me:de, messenger:default           - Consume scheduler queue"
@@ -556,7 +535,7 @@ dev() {
             echo ""
             echo "Services:"
             echo "  seq, se, open:sequelace                - Run Sequel Ace"
-            echo "  mail, mailhog, op:ma, open:mailhog     - Open Mailhog"
+            echo "  mail, mailpit, op:ma, open:mailpit     - Open Mailpit"
             echo ""
             echo "Testing:"
             echo "  t, test, tests, phpunit, php:phpunit   - Run PHPUnit tests"
@@ -589,8 +568,8 @@ if [[ -n $ZSH_VERSION ]]; then
             build
             up down
             status
-            mailhog
-            open:mailhog
+            mailpit
+            open:mailpit
             open:website
             open:sequelace
             seq
@@ -627,5 +606,5 @@ if [[ -n $ZSH_VERSION ]]; then
         )
         compadd -a cmds
     }
-    compdef _dev dev
+    (( $+functions[compdef] )) && compdef _dev dev
 fi

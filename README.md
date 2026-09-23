@@ -54,8 +54,8 @@ Running dev without known commands executes `ddev exec`.
 - `cr`, `ca:rm`, `cache:remove`, `carm` - Remove cache directory
 
 #### Development
-- `u`, `up` - Start OrbStack, ddev, Sequel Ace, Mailpit, Website and Cursor
-- `d`, `down` - Stop ddev and OrbStack
+- `u`, `up` - Start ddev, open Website and IDE (`$IDE`, default: `code`)
+- `d`, `down` - Stop ddev
 - `r`, `restart` - Restart ddev
 - `s` - SSH into container
 - `st` `status`, `stat` - Show status
@@ -70,7 +70,7 @@ Running dev without known commands executes `ddev exec`.
 - `sql`, `query`, `dbquery`, `dqs`, `do:qu:sq` - Execute SQL query
 
 #### Messenger
-- `mc`, `me:co`, `messenger:consume` - Consume all queues
+- `mc`, `me:co`, `messenger:consume` - Run messenger:consume
 - `mf`, `me:fa`, `messenger:failed` - Consume failed queue
 - `mh`, `me:hi`, `messenger:high` - Consume high priority queue
 - `mn`, `me:no`, `messenger:normal` - Consume normal priority queue
@@ -79,8 +79,8 @@ Running dev without known commands executes `ddev exec`.
 - `ms`, `me:st`, `messenger:stats` - Show messenger queue stats
 
 #### Services
-- `seq`, `start:sequelace`, `se` - Run Sequel Ace
-- `mail`, `mailhog`, `op:ma`, `open:mailhog` - Open Mailhog
+- `seq`, `se`, `open:sequelace` - Run Sequel Ace
+- `mail`, `mailpit`, `op:ma`, `open:mailpit` - Open Mailpit
 
 #### Testing
 - `t`, `test`, `tests`, `phpunit`, `php:phpunit` - Run PHPUnit tests
