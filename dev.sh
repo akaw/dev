@@ -6,7 +6,7 @@
 #
 # Description: dDEV symfony dev shortening tools
 # Usage: dev [OPTIONS]
-# Version: 1.4.6
+# Version: 1.4.7
 # https://github.com/akaw/dev/
 
 # Editor used by 'dev up' (override via IDE env var)
