@@ -9,6 +9,9 @@
 # Version: 1.4.6
 # https://github.com/akaw/dev/
 
+# Editor used by 'dev up' (override via IDE env var)
+IDE="${IDE:-code}"
+
 # Helper function: Reads the latest version number from Git tags
 _get_latest_version() {
     if ! git rev-parse --git-dir > /dev/null 2>&1; then
@@ -167,9 +170,10 @@ _get_script_path() {
     
     # 4. Try common installation locations
     if [[ -z "$script_path" ]]; then
-        for path in ~/bin/${script_name}.sh "$HOME/bin/${script_name}.sh" /usr/local/bin/${script_name}.sh /opt/dev/${script_name}.sh; do
-            if [[ -f "$path" ]] && grep -q "^# Version:" "$path" 2>/dev/null; then
-                script_path="$path"
+        # Note: don't name the loop variable 'path' - in zsh it is tied to $PATH
+        for candidate_path in ~/bin/${script_name}.sh "$HOME/bin/${script_name}.sh" /usr/local/bin/${script_name}.sh /opt/dev/${script_name}.sh; do
+            if [[ -f "$candidate_path" ]] && grep -q "^# Version:" "$candidate_path" 2>/dev/null; then
+                script_path="$candidate_path"
                 break
             fi
         done
@@ -354,17 +358,13 @@ dev() {
                 echo "Error: No .ddev folder found in current directory. Please navigate to a ddev project or initialize one with 'ddev config'." >&2
                 return 1
             fi
-            echo "Starting ddev, Sequel Ace, Mailpit, Website and Cursor..."
+            echo "Starting ddev, open Website and IDE..."
             command ddev start
             command ddev status
-            echo "Starting ddev sequelace..."
-            command ddev sequelace
-            echo "Starting ddev mailpit..."
-            command ddev mailpit
             echo "Starting ddev launch..."
             command ddev launch
             echo "Starting ide..."
-            command code .
+            command $IDE .
             echo "Done!"    
             ;;
         d|down)
@@ -530,7 +530,7 @@ dev() {
             echo "  cr, ca:rm, cache:remove, carm          - Remove cache directory"
             echo ""
             echo "Development:"
-            echo "  u, up                                  - Start ddev, Sequel Ace, Mailpit, Website and Cursor"
+            echo "  u, up                                  - Start ddev, open Website and $IDE"
             echo "  d, down                                - Stop ddev"
             echo "  r, restart                             - Restart ddev"
             echo "  s                                      - SSH into container"
