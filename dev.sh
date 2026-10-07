@@ -413,6 +413,7 @@ _prune_backups() {
 }
 
 dev() {
+    [[ $# -eq 0 ]] && set -- help
     case "$1" in
         ssh)
             command ddev ssh
@@ -491,13 +492,13 @@ dev() {
         messenger:stats|me:st|ms)
             command ddev exec bin/console messenger:stats 
             ;;
-        logs:show|lo:sh|losh|ls|show:logs|sh:lo|shlo|l|logs)
+        logs:show|lo:sh|losh|show:logs|sh:lo|shlo|l|logs)
             command ddev exec tail -n 100 "$(_get_log_file_path "$2")"
             ;;
         logs:tail|lo:ta|lota|lt|tail:logs|ta:lo|talo|tl)
             command ddev exec tail -n 100 -f "$(_get_log_file_path "$2")"
             ;;
-        logs:cat|lo:ca|loca|lc|cat:logs|ca:lo|calo|cl)
+        logs:cat|lo:ca|loca|lc|cat:logs|ca:lo|calo)
             command ddev exec cat "$(_get_log_file_path "$2")"
             ;;
         doctrine:migrations:migrate|do:mi:mi|domimi|dmm|migrate|mig|mm)
@@ -527,7 +528,7 @@ dev() {
             shift
             command ddev xdebug "${@:-status}"
             ;;
-        php:phpunit|phpunit|test|tests|t)
+        php:phpunit|phpunit|tests|t)
             command ddev exec php vendor/bin/phpunit
             ;;
         release:version|re:ve|reve)
@@ -623,12 +624,13 @@ dev() {
             echo "  status, stat, st                       - Show status"
             echo "  e, exec                                - Execute command in container"
             echo "  c, console                             - Run console command"
-            echo "  web, site, website, open:website, ow   - Open website"
-            echo "  l, logs, show:logs, lo:sh              - View logs"
-            echo "  tl, tail:logs, lo:ta, lota             - Tail logs"
+            echo "  ow, web, site, website, open:website   - Open website"
+            echo "  l, logs, logs:show, show:logs, lo:sh   - View logs (last 100 lines)"
+            echo "  lt, tl, logs:tail, tail:logs, lo:ta    - Tail logs"
+            echo "  lc, logs:cat, cat:logs, lo:ca         - Print whole log file"
             echo ""
             echo "Database & Migrations:"
-            echo "  mm, dmm, migrate, mig, do:mi:mi        - Run migrations (backs up DB first, skip: DEV_NO_BACKUP=1)"
+            echo "  mm, dmm, migrate, mig, do:mi:mi, domimi - Run migrations (backs up DB first, skip: DEV_NO_BACKUP=1)"
             echo "  sql, query, dbquery, dqs, do:qu:sq     - Execute SQL query"
             echo "  bd, ba:db, backup:database             - Export DB to .ddev/backup-<branch>-<timestamp>.sql.gz"
             echo "  rd, re:db, restore:database [file]     - Import newest backup of this branch (or given file)"
@@ -645,11 +647,11 @@ dev() {
             echo "  ms, me:st, messenger:stats             - Show messenger queue stats"
             echo ""
             echo "Services:"
-            echo "  s, seq, se, open:sequelace             - Run Sequel Ace"
-            echo "  mail, mailpit, op:ma, open:mailpit     - Open Mailpit"
+            echo "  s, se, seq, os, open:sequelace, op:se  - Run Sequel Ace"
+            echo "  om, mail, mailpit, open:mailpit, op:ma - Open Mailpit (mailhog = legacy alias)"
             echo ""
             echo "Testing:"
-            echo "  t, test, tests, phpunit, php:phpunit   - Run PHPUnit tests"
+            echo "  t, tests, phpunit, php:phpunit         - Run PHPUnit tests"
             echo ""
             echo "Release Management:"
             echo "  release:version, re:ve, reve           - Show latest version"
@@ -684,6 +686,7 @@ if [[ -n $ZSH_VERSION ]]; then
             open:website
             open:sequelace
             ssh
+            restart exec console
             seq
             messenger:consume
             messenger:failed
@@ -697,17 +700,19 @@ if [[ -n $ZSH_VERSION ]]; then
             tail:logs
             logs:tail
             logs:show
+            logs:cat
             cache:remove
             npm:build
             doctrine:migrations:migrate
             migrate
             sql dbquery query
+            doctrine:query:sql
             backup:database
             restore:database
             backup:list
             backup:prune
             xdebug
-            phpunit php:phpunit test tests
+            phpunit php:phpunit tests
             release:version
             release:patch
             release:minor

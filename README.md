@@ -88,7 +88,7 @@ Running dev without known commands executes `ddev exec`.
 - `mail`, `mailpit`, `op:ma`, `open:mailpit` - Open Mailpit
 
 #### Testing
-- `t`, `test`, `tests`, `phpunit`, `php:phpunit` - Run PHPUnit tests
+- `t`, `tests`, `phpunit`, `php:phpunit` - Run PHPUnit tests
 
 #### Release Management
 - `release:version`, `re:ve`, `reve` - Show latest version
