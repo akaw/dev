@@ -421,6 +421,16 @@ dev() {
         doctrine:query:sql|do:qu:sq|dqs|dbquery|query|sql)
             command ddev exec bin/console doctrine:query:sql "$2"
             ;;
+        backup:database|ba:db|bd)
+            if [[ ! -d .ddev ]]; then
+                echo "Error: No .ddev folder found in current directory." >&2
+                return 1
+            fi
+            # Slashes in branch names (feature/foo) would break the file path
+            local branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-')
+            local backup_file=".ddev/backup-${branch:-no-branch}-$(date +%Y%m%d-%H%M%S).sql.gz"
+            command ddev export-db --file="$backup_file" && echo "Backup written to $backup_file"
+            ;;
         php:phpunit|phpunit|test|tests|t)
             command ddev exec php vendor/bin/phpunit
             ;;
@@ -523,6 +533,7 @@ dev() {
             echo "Database & Migrations:"
             echo "  mm, dmm, migrate, mig, do:mi:mi        - Run migrations"
             echo "  sql, query, dbquery, dqs, do:qu:sq     - Execute SQL query"
+            echo "  bd, ba:db, backup:database             - Export DB to .ddev/backup-<branch>-<timestamp>.sql.gz"
             echo ""
             echo "Messenger:"
             echo "  mc, me:co, messenger:consume           - Run messenger:consume"
@@ -590,6 +601,7 @@ if [[ -n $ZSH_VERSION ]]; then
             doctrine:migrations:migrate
             migrate
             sql dbquery query
+            backup:database
             phpunit php:phpunit test tests
             release:version
             release:patch
