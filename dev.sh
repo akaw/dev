@@ -412,6 +412,85 @@ _prune_backups() {
     done
 }
 
+# Command table: single source for `dev help` and zsh completion.
+# Format: "# Section" header, or "aliases|usage|description" (aliases space-separated).
+_dev_command_table() {
+    cat <<EOF
+# Cache & Build
+cc ca:cl cache:clear cacl||Clear cache
+b build np:bu npm:build||Build assets
+ccb ca:cl:bu cache:clear:build||Clear cache and build assets
+cr ca:rm cache:remove||Remove cache directory
+# Development
+u up||Start ddev, open Website and $IDE
+d down||Stop ddev
+r restart||Restart ddev
+ssh||SSH into container
+xd xdebug|[on/off/status]|Control Xdebug (default: status)
+status stat st||Show status
+e exec||Execute command in container
+c console||Run console command
+ow web site website open:website||Open website
+l logs logs:show show:logs lo:sh||View logs (last 100 lines)
+lt tl logs:tail tail:logs lo:ta||Tail logs
+lc logs:cat cat:logs lo:ca||Print whole log file
+# Database & Migrations
+mm dmm migrate mig do:mi:mi domimi doctrine:migrations:migrate||Run migrations (backs up DB first, skip: DEV_NO_BACKUP=1)
+sql query dbquery dqs do:qu:sq doctrine:query:sql||Execute SQL query
+bd ba:db backup:database||Export DB to .ddev/backup-<branch>-<timestamp>.sql.gz
+rd re:db restore:database|[file]|Import newest backup of this branch (or given file)
+bl ba:li backup:list||List backups in .ddev
+bp ba:pr backup:prune|[N]|Keep only newest N (default 5) backups of this branch
+# Messenger
+mc me:co messenger:consume||Run messenger:consume
+mf me:fa messenger:failed||Consume failed queue
+mh me:hi messenger:high||Consume high priority queue
+mn me:no messenger:normal||Consume normal priority queue
+md me:de messenger:default||Consume scheduler queue
+ma me:al messenger:all||Consume all queues
+ms me:st messenger:stats||Show messenger queue stats
+# Services
+s se seq os open:sequelace op:se||Run Sequel Ace
+om mail mailpit open:mailpit op:ma||Open Mailpit (mailhog = legacy alias)
+# Testing
+t tests phpunit php:phpunit||Run PHPUnit tests
+# Release Management
+release:version re:ve reve||Show latest version
+release:patch re:pa repa||Create patch release
+release:minor re:mi remi||Create minor release
+release:major re:ma rema||Create major release
+# Other
+upgrade||Upgrade dev script to latest version
+reload||Reload dev environment
+version -V --version||Show dev script version
+help -h --help||Show this help
+EOF
+}
+
+# Helper function: Prints the help text generated from the command table
+_dev_help() {
+    echo "Usage: dev [command]"
+    echo "Default command: ddev exec [command]."
+    local line aliases usage desc names
+    _dev_command_table | while IFS= read -r line; do
+        if [[ "$line" == "# "* ]]; then
+            echo ""
+            echo "${line#\# }:"
+        else
+            aliases="${line%%|*}"
+            usage="${line#*|}"; usage="${usage%%|*}"
+            desc="${line##*|}"
+            names="${aliases// /, }${usage:+ $usage}"
+            printf '  %-38s - %s\n' "$names" "$desc"
+        fi
+    done
+}
+
+# Helper function: Prints all command names, one per line (for completion)
+_dev_command_names() {
+    _dev_command_table | grep -v '^# ' | cut -d'|' -f1 | tr ' ' '\n'
+}
+
 dev() {
     [[ $# -eq 0 ]] && set -- help
     case "$1" in
@@ -606,64 +685,7 @@ dev() {
             echo "dev $( grep -m 1 "^# Version:" "$( _get_script_path "dev" 2>/dev/null || echo "${BASH_SOURCE[0]:-$0}" )" 2>/dev/null | awk '{print $NF}' )"
             ;;
         help|-h|--help)
-            echo "Usage: dev [command]"
-            echo "Default command: ddev exec [command]."
-            echo ""
-            echo "Cache & Build:"
-            echo "  cc, ca:cl, cache:clear, cacl           - Clear cache"
-            echo "  b, build, np:bu, npm:build             - Build assets"
-            echo "  ccb, ca:cl:bu, cache:clear:build       - Clear cache and build assets"
-            echo "  cr, ca:rm, cache:remove, carm          - Remove cache directory"
-            echo ""
-            echo "Development:"
-            echo "  u, up                                  - Start ddev, open Website and $IDE"
-            echo "  d, down                                - Stop ddev"
-            echo "  r, restart                             - Restart ddev"
-            echo "  ssh                                    - SSH into container"
-            echo "  xd, xdebug [on|off|status]             - Control Xdebug (default: status)"
-            echo "  status, stat, st                       - Show status"
-            echo "  e, exec                                - Execute command in container"
-            echo "  c, console                             - Run console command"
-            echo "  ow, web, site, website, open:website   - Open website"
-            echo "  l, logs, logs:show, show:logs, lo:sh   - View logs (last 100 lines)"
-            echo "  lt, tl, logs:tail, tail:logs, lo:ta    - Tail logs"
-            echo "  lc, logs:cat, cat:logs, lo:ca         - Print whole log file"
-            echo ""
-            echo "Database & Migrations:"
-            echo "  mm, dmm, migrate, mig, do:mi:mi, domimi - Run migrations (backs up DB first, skip: DEV_NO_BACKUP=1)"
-            echo "  sql, query, dbquery, dqs, do:qu:sq     - Execute SQL query"
-            echo "  bd, ba:db, backup:database             - Export DB to .ddev/backup-<branch>-<timestamp>.sql.gz"
-            echo "  rd, re:db, restore:database [file]     - Import newest backup of this branch (or given file)"
-            echo "  bl, ba:li, backup:list                 - List backups in .ddev"
-            echo "  bp, ba:pr, backup:prune [N]            - Keep only newest N (default 5) backups of this branch"
-            echo ""
-            echo "Messenger:"
-            echo "  mc, me:co, messenger:consume           - Run messenger:consume"
-            echo "  mf, me:fa, messenger:failed            - Consume failed queue"
-            echo "  mh, me:hi, messenger:high              - Consume high priority queue"
-            echo "  mn, me:no, messenger:normal            - Consume normal priority queue"
-            echo "  md, me:de, messenger:default           - Consume scheduler queue"
-            echo "  ma, me:al, messenger:all               - Consume all queues"
-            echo "  ms, me:st, messenger:stats             - Show messenger queue stats"
-            echo ""
-            echo "Services:"
-            echo "  s, se, seq, os, open:sequelace, op:se  - Run Sequel Ace"
-            echo "  om, mail, mailpit, open:mailpit, op:ma - Open Mailpit (mailhog = legacy alias)"
-            echo ""
-            echo "Testing:"
-            echo "  t, tests, phpunit, php:phpunit         - Run PHPUnit tests"
-            echo ""
-            echo "Release Management:"
-            echo "  release:version, re:ve, reve           - Show latest version"
-            echo "  release:patch, re:pa, repa             - Create patch release"
-            echo "  release:minor, re:mi, remi             - Create minor release"
-            echo "  release:major, re:ma, rema             - Create major release"
-            echo ""
-            echo "Other:"
-            echo "  upgrade                                - Upgrade dev script to latest version"
-            echo "  reload                                 - Reload dev environment"
-            echo "  version, -V, --version                 - Show dev script version"
-            echo "  help, -h, --help                       - Show this help"
+            _dev_help
             ;;
         *)
             command ddev exec "$@"
@@ -675,57 +697,7 @@ dev() {
 if [[ -n $ZSH_VERSION ]]; then
     _dev() {
         local -a cmds
-        cmds=(
-            cache:clear
-            cache:clear:build
-            build
-            up down
-            status
-            mailpit
-            open:mailpit
-            open:website
-            open:sequelace
-            ssh
-            restart exec console
-            seq
-            messenger:consume
-            messenger:failed
-            messenger:high
-            messenger:normal
-            messenger:default
-            messenger:all
-            messenger:stats
-            logs
-            show:logs
-            tail:logs
-            logs:tail
-            logs:show
-            logs:cat
-            cache:remove
-            npm:build
-            doctrine:migrations:migrate
-            migrate
-            sql dbquery query
-            doctrine:query:sql
-            backup:database
-            restore:database
-            backup:list
-            backup:prune
-            xdebug
-            phpunit php:phpunit tests
-            release:version
-            release:patch
-            release:minor
-            release:major
-            reload
-            upgrade
-            version
-            -V
-            --version
-            help
-            -h
-            --help
-        )
+        cmds=( ${(f)"$(_dev_command_names)"} )
         compadd -a cmds
     }
     (( $+functions[compdef] )) && compdef _dev dev
