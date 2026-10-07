@@ -2,7 +2,7 @@
 
 Bash script that provides shortcuts for frequently used `ddev` and `symfony` commands.
 
-**Version:** 1.4.7
+**Version:** 1.5.0
 
 This repository contains:
 
@@ -107,7 +107,7 @@ https://github.com/akaw/dev/
 
 ## Version
 
-Current Version: **1.4.7**
+Current Version: **1.5.0**
 
 Versions can be retrieved directly from the script:
 
