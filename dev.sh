@@ -327,6 +327,91 @@ _get_log_file_path() {
     fi
 }
 
+# Helper function: Branch name usable in file names (feature/foo -> feature-foo)
+_branch_slug() {
+    local branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-')
+    echo "${branch:-no-branch}"
+}
+
+# Helper function: Lists backups of the current branch in .ddev, oldest first
+_list_branch_backups() {
+    find .ddev -maxdepth 1 -type f \
+        -name "backup-$(_branch_slug)-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9].sql.gz" \
+        2>/dev/null | sort
+}
+
+# Helper function: Exports the database to .ddev/backup-<branch>-<timestamp>.sql.gz
+_backup_database() {
+    if [[ ! -d .ddev ]]; then
+        echo "Error: No .ddev folder found in current directory." >&2
+        return 1
+    fi
+    local backup_file=".ddev/backup-$(_branch_slug)-$(date +%Y%m%d-%H%M%S).sql.gz"
+    command ddev export-db --file="$backup_file" || return 1
+    echo "[INFO] Backup written to $backup_file"
+
+    # Dumps usually contain personal data and must not end up in the repository
+    if git rev-parse --git-dir > /dev/null 2>&1 && ! git check-ignore -q "$backup_file"; then
+        echo "[WARNING] $backup_file is not git-ignored. Add '.ddev/backup-*.sql.gz' to your .gitignore." >&2
+    fi
+}
+
+# Helper function: Imports a backup (default: newest of the current branch) after confirmation
+_restore_database() {
+    local restore_file="$1"
+    if [[ ! -d .ddev ]]; then
+        echo "Error: No .ddev folder found in current directory." >&2
+        return 1
+    fi
+    [[ -z "$restore_file" ]] && restore_file=$(_list_branch_backups | tail -n 1)
+    if [[ -z "$restore_file" || ! -f "$restore_file" ]]; then
+        echo "Error: No backup found for branch '$(_branch_slug)'. Pass a file: dev rd <file>" >&2
+        return 1
+    fi
+    local reply
+    printf "Import %s? The current database content will be replaced. [y/N] " "$restore_file"
+    read -r reply
+    if [[ ! "$reply" =~ ^[Yy]$ ]]; then
+        echo "Restore cancelled."
+        return 1
+    fi
+    command ddev import-db --file="$restore_file"
+}
+
+# Helper function: Lists all database backups in .ddev
+_list_backups() {
+    if [[ ! -d .ddev ]]; then
+        echo "Error: No .ddev folder found in current directory." >&2
+        return 1
+    fi
+    local file
+    find .ddev -maxdepth 1 -type f -name 'backup-*.sql.gz' 2>/dev/null | sort | while IFS= read -r file; do
+        printf "%8s  %s\n" "$(du -h "$file" | awk '{print $1}')" "$file"
+    done
+}
+
+# Helper function: Deletes all but the newest N backups (default 5) of the current branch
+_prune_backups() {
+    local keep="${1:-5}"
+    if [[ ! "$keep" =~ ^[0-9]+$ ]]; then
+        echo "Error: Number of backups to keep must be a non-negative integer." >&2
+        return 1
+    fi
+    if [[ ! -d .ddev ]]; then
+        echo "Error: No .ddev folder found in current directory." >&2
+        return 1
+    fi
+    local old=$(_list_branch_backups | sort -r | tail -n +$((10#$keep + 1)))
+    if [[ -z "$old" ]]; then
+        echo "[INFO] Nothing to prune for branch '$(_branch_slug)'."
+        return 0
+    fi
+    local file
+    echo "$old" | while IFS= read -r file; do
+        rm -f -- "$file" && echo "[INFO] Removed $file"
+    done
+}
+
 dev() {
     case "$1" in
         s)
@@ -416,20 +501,31 @@ dev() {
             command ddev exec cat "$(_get_log_file_path "$2")"
             ;;
         doctrine:migrations:migrate|do:mi:mi|domimi|dmm|migrate|mig|mm)
+            # Back up first; set DEV_NO_BACKUP=1 to skip (e.g. projects without a database)
+            if [[ -z "${DEV_NO_BACKUP:-}" ]] && ! _backup_database; then
+                echo "Error: Backup failed - aborting migration (set DEV_NO_BACKUP=1 to skip)." >&2
+                return 1
+            fi
             command ddev exec bin/console doctrine:migrations:migrate --no-interaction
             ;;
         doctrine:query:sql|do:qu:sq|dqs|dbquery|query|sql)
             command ddev exec bin/console doctrine:query:sql "$2"
             ;;
         backup:database|ba:db|bd)
-            if [[ ! -d .ddev ]]; then
-                echo "Error: No .ddev folder found in current directory." >&2
-                return 1
-            fi
-            # Slashes in branch names (feature/foo) would break the file path
-            local branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-')
-            local backup_file=".ddev/backup-${branch:-no-branch}-$(date +%Y%m%d-%H%M%S).sql.gz"
-            command ddev export-db --file="$backup_file" && echo "Backup written to $backup_file"
+            _backup_database
+            ;;
+        restore:database|re:db|rd)
+            _restore_database "$2"
+            ;;
+        backup:list|ba:li|bl)
+            _list_backups
+            ;;
+        backup:prune|ba:pr|bp)
+            _prune_backups "$2"
+            ;;
+        xdebug|xd)
+            shift
+            command ddev xdebug "${@:-status}"
             ;;
         php:phpunit|phpunit|test|tests|t)
             command ddev exec php vendor/bin/phpunit
@@ -523,6 +619,7 @@ dev() {
             echo "  d, down                                - Stop ddev"
             echo "  r, restart                             - Restart ddev"
             echo "  s                                      - SSH into container"
+            echo "  xd, xdebug [on|off|status]             - Control Xdebug (default: status)"
             echo "  status, stat, st                       - Show status"
             echo "  e, exec                                - Execute command in container"
             echo "  c, console                             - Run console command"
@@ -531,9 +628,12 @@ dev() {
             echo "  tl, tail:logs, lo:ta, lota             - Tail logs"
             echo ""
             echo "Database & Migrations:"
-            echo "  mm, dmm, migrate, mig, do:mi:mi        - Run migrations"
+            echo "  mm, dmm, migrate, mig, do:mi:mi        - Run migrations (backs up DB first, skip: DEV_NO_BACKUP=1)"
             echo "  sql, query, dbquery, dqs, do:qu:sq     - Execute SQL query"
             echo "  bd, ba:db, backup:database             - Export DB to .ddev/backup-<branch>-<timestamp>.sql.gz"
+            echo "  rd, re:db, restore:database [file]     - Import newest backup of this branch (or given file)"
+            echo "  bl, ba:li, backup:list                 - List backups in .ddev"
+            echo "  bp, ba:pr, backup:prune [N]            - Keep only newest N (default 5) backups of this branch"
             echo ""
             echo "Messenger:"
             echo "  mc, me:co, messenger:consume           - Run messenger:consume"
@@ -602,6 +702,10 @@ if [[ -n $ZSH_VERSION ]]; then
             migrate
             sql dbquery query
             backup:database
+            restore:database
+            backup:list
+            backup:prune
+            xdebug
             phpunit php:phpunit test tests
             release:version
             release:patch

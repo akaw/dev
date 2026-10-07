@@ -58,6 +58,7 @@ Running dev without known commands executes `ddev exec`.
 - `d`, `down` - Stop ddev
 - `r`, `restart` - Restart ddev
 - `s` - SSH into container
+- `xd`, `xdebug [on|off|status]` - Control Xdebug (default: status)
 - `st` `status`, `stat` - Show status
 - `e`, `exec` - Execute command in container
 - `c`, `console` - Run console command
@@ -66,8 +67,12 @@ Running dev without known commands executes `ddev exec`.
 - `tl`, `tail:logs`, `lo:ta`, `lota` - Tail logs
 
 #### Database & Migrations
-- `mm`, `dmm`, `migrate`, `mig`, `do:mi:mi` - Run migrations
+- `mm`, `dmm`, `migrate`, `mig`, `do:mi:mi` - Run migrations (creates a DB backup first; skip with `DEV_NO_BACKUP=1`)
 - `sql`, `query`, `dbquery`, `dqs`, `do:qu:sq` - Execute SQL query
+- `bd`, `ba:db`, `backup:database` - Export DB to `.ddev/backup-<branch>-<timestamp>.sql.gz` (warns if the file is not git-ignored)
+- `rd`, `re:db`, `restore:database [file]` - Import the newest backup of the current branch (or the given file) after confirmation
+- `bl`, `ba:li`, `backup:list` - List backups in `.ddev`
+- `bp`, `ba:pr`, `backup:prune [N]` - Keep only the newest N (default 5) backups of the current branch
 
 #### Messenger
 - `mc`, `me:co`, `messenger:consume` - Run messenger:consume
