@@ -57,7 +57,7 @@ Running dev without known commands executes `ddev exec`.
 - `u`, `up` - Start ddev, open Website and IDE (`$IDE`, default: `code`)
 - `d`, `down` - Stop ddev
 - `r`, `restart` - Restart ddev
-- `s` - SSH into container
+- `ssh` - SSH into container
 - `xd`, `xdebug [on|off|status]` - Control Xdebug (default: status)
 - `st` `status`, `stat` - Show status
 - `e`, `exec` - Execute command in container
@@ -84,7 +84,7 @@ Running dev without known commands executes `ddev exec`.
 - `ms`, `me:st`, `messenger:stats` - Show messenger queue stats
 
 #### Services
-- `seq`, `se`, `open:sequelace` - Run Sequel Ace
+- `s`, `seq`, `se`, `open:sequelace` - Run Sequel Ace
 - `mail`, `mailpit`, `op:ma`, `open:mailpit` - Open Mailpit
 
 #### Testing

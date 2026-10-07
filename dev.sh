@@ -414,7 +414,7 @@ _prune_backups() {
 
 dev() {
     case "$1" in
-        s)
+        ssh)
             command ddev ssh
             ;;
         u|up)
@@ -449,7 +449,7 @@ dev() {
         status|stat|st)
             command ddev status
             ;;
-        open:sequelace|op:se|opse|os|se|seq)
+        open:sequelace|op:se|opse|os|s|se|seq)
             command ddev sequelace
             ;;
         open:website|op:we|opwe|ow|website|site|web)
@@ -618,7 +618,7 @@ dev() {
             echo "  u, up                                  - Start ddev, open Website and $IDE"
             echo "  d, down                                - Stop ddev"
             echo "  r, restart                             - Restart ddev"
-            echo "  s                                      - SSH into container"
+            echo "  ssh                                    - SSH into container"
             echo "  xd, xdebug [on|off|status]             - Control Xdebug (default: status)"
             echo "  status, stat, st                       - Show status"
             echo "  e, exec                                - Execute command in container"
@@ -645,7 +645,7 @@ dev() {
             echo "  ms, me:st, messenger:stats             - Show messenger queue stats"
             echo ""
             echo "Services:"
-            echo "  seq, se, open:sequelace                - Run Sequel Ace"
+            echo "  s, seq, se, open:sequelace             - Run Sequel Ace"
             echo "  mail, mailpit, op:ma, open:mailpit     - Open Mailpit"
             echo ""
             echo "Testing:"
@@ -683,6 +683,7 @@ if [[ -n $ZSH_VERSION ]]; then
             open:mailpit
             open:website
             open:sequelace
+            ssh
             seq
             messenger:consume
             messenger:failed
