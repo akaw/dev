@@ -566,7 +566,7 @@ dev() {
             command ddev exec bin/console messenger:consume scheduler_default -vv
             ;;
         messenger:all|me:al|ma)
-            command ddev exec bin/console messenger:consume async_priority_high async_priority_normal scheduler_default failed -vv
+            command ddev exec bin/console messenger:consume --all -vv
             ;;
         messenger:stats|me:st|ms)
             command ddev exec bin/console messenger:stats 
